@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mind-to-Delivery (Gamificado • 1 página)</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#111823; --panel2:#0f1620; --text:#e8eef7;
+      --muted:#9fb0c3; --line:#223044; --ok:#31d07f; --warn:#f5c84b; --bad:#ff5a6a;
+      --chip:#1a2533; --accent:#6aa9ff; --radius:14px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:linear-gradient(180deg,#070a0f 0%, #0b0f14 30%, #0b0f14 100%);
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(11,15,20,.85); backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .top{display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;}
+    .title{display:flex; gap:12px; align-items:center}
+    .badge{padding:6px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--line);color:var(--muted);}
+    .kpis{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .kpi{padding:10px 12px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);min-width:160px;}
+    .kpi b{display:block;font-size:16px}
+    .kpi span{color:var(--muted); font-size:12px}
+    .bar{height:10px;background:#0a111a;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:8px;}
+    .bar > i{display:block;height:100%;width:0%;background:var(--accent)}
+    .tabs{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+    .tab{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:8px 10px;border-radius:999px;cursor:pointer;user-select:none;}
+    .tab.active{background:var(--accent);border-color:transparent;color:#06111f;font-weight:800}
+    main .grid{display:grid; gap:14px; grid-template-columns: 1.2fr 0.8fr; align-items:start;}
+    @media (max-width: 900px){ main .grid{grid-template-columns:1fr} }
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;}
+    .card h2{margin:0 0 8px 0;font-size:16px}
+    .muted{color:var(--muted)}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .btn{
+      border:1px solid var(--line); background:var(--panel2); color:var(--text);
+      padding:9px 12px; border-radius:12px; cursor:pointer; font-weight:700;
+    }
+    .btn.primary{background:var(--accent); color:#06111f; border-color:transparent}
+    .btn.danger{background:transparent; color:var(--bad); border-color:#3a1b22}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--muted);font-size:12px}
+    .sep{height:1px;background:var(--line);margin:12px 0}
+    .log{max-height:290px; overflow:auto; border-radius:12px; border:1px solid var(--line); background:#0b111a; padding:10px}
+    .log div{padding:8px 0; border-bottom:1px dashed #1b2737}
+    .log div:last-child{border-bottom:none}
+    .mini{display:flex; justify-content:space-between; gap:10px; align-items:center}
+    .mini b{font-size:14px}
+    .mini span{color:var(--muted)}
+    .two{display:grid; gap:10px; grid-template-columns:1fr 1fr;}
+    @media (max-width:700px){ .two{grid-template-columns:1fr} }
+    code.k{background:#0b111a; border:1px solid var(--line); padding:2px 6px; border-radius:8px}
+    footer{color:var(--muted); padding:22px 0}
+
+    /* Modal (Wizard "Nova ideia?") */
+    .modalBack{
+      position:fixed; inset:0; background:rgba(0,0,0,.6);
+      display:none; align-items:center; justify-content:center; z-index:999;
+      padding:16px;
+    }
+    .modal{
+      width:min(920px, 100%); max-height:86vh; overflow:auto;
+      background:var(--panel); border:1px solid var(--line); border-radius:18px;
+      padding:14px;
+    }
+    .q{
+      border:1px solid var(--line); background:#0c121c;
+      border-radius:12px; padding:12px; margin:10px 0;
+    }
+    .q label{display:block; font-weight:800; margin-bottom:8px}
+    input[type="text"], input[type="number"], textarea, select{
+      width:100%; padding:10px 12px; border-radius:10px;
+      border:1px solid var(--line); background:#08101a; color:var(--text);
+      outline:none;
+    }
+    textarea{min-height:90px; resize:vertical}
+    .tag{
+      padding:6px 10px; border-radius:999px; background:var(--chip); border:1px solid var(--line);
+      cursor:pointer; user-select:none;
+    }
+    .tag.on{background:var(--ok); border-color:transparent; color:#04140a; font-weight:900}
+    .listbox{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+    .small{font-size:12px}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="title">
+        <div style="font-size:18px;font-weight:900">Mind-to-Delivery</div>
+        <span class="badge">As perguntas só aparecem em <b>“Nova ideia?”</b></span>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top:14px">
+  <div class="grid">
+    <section class="card" id="mainCard"></section>
+
+    <aside style="display:grid; gap:10px">
+      <div class="card">
+        <h2>Controles</h2>
+        <div class="row">
+          <button class="btn primary" id="btnNewIdea">Nova ideia?</button>
+          <button class="btn" id="btnSave">Salvar</button>
+          <button class="btn" id="btnExport">Exportar</button>
+          <button class="btn" id="btnImport">Importar</button>
+          <button class="btn danger" id="btnReset">Resetar</button>
+        </div>
+        <div class="sep"></div>
+        <div class="row">
+          <button class="btn" id="btnDailyCheckin">Check-in diário (+XP)</button>
+          <span class="pill" id="checkinInfo">—</span>
+        </div>
+        <p class="muted small" style="margin-top:10px">
+          O <b>dashboard</b> mostra só: estado do projeto, progresso, histórico e rotina diária.
+          As <b>perguntas</b> aparecem apenas quando você cria/atualiza um projeto via “Nova ideia?”.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Gamificação</h2>
+        <div class="mini"><b>Nível</b><span id="lvl">1</span></div>
+        <div class="mini"><b>XP</b><span id="xp">0</span></div>
+        <div class="mini"><b>Streak</b><span id="streak">0 dias</span></div>
+        <div class="mini"><b>Projeto ativo</b><span id="activeProject">—</span></div>
+        <div class="bar"><i id="levelBar"></i></div>
+        <p class="muted small" style="margin:10px 0 0">
+          Regras padrão: <code class="k">+50 XP</code> por marco concluído, <code class="k">+15 XP</code> por check-in diário,
+          <code class="k">+10 XP</code> bônus por dia em streak (cap 100).
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="wrap muted small">
+    Tudo roda localmente (LocalStorage). Salve como <code class="k">index.html</code> e abra no navegador.
+  </footer>
+</main>
+
+<!-- Modal / Wizard -->
+<div class="modalBack" id="wizardBack">
+  <div class="modal">
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="font-size:16px;font-weight:900">Nova ideia → Projeto executável</div>
+        <div class="muted small" id="wizardSubtitle">—</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="wizPrev">◀</button>
+        <button class="btn" id="wizNext">▶</button>
+        <button class="btn danger" id="wizClose">Fechar</button>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div id="wizardBody"></div>
+
+    <div class="sep"></div>
+
+    <div class="row" style="justify-content:space-between">
+      <div class="muted small">As respostas do wizard viram o “resumo do projeto” no dashboard.</div>
+      <div class="row">
+        <button class="btn" id="wizSaveDraft">Salvar rascunho</button>
+        <button class="btn primary" id="wizFinish">Finalizar (criar/atualizar projeto)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // =========================
+  // 1) TEMPLATE (JSON base)
+  // =========================
+  const FLOW = {
+    flow: {
+      id: "idea_to_execution_v1",
+      stages: [
+        { id:"stage_01", title:"Clareza da Ideia", goal:"Tirar do abstrato para o concreto.", questions:[
+          {id:"q01", prompt:"O que exatamente é essa ideia em uma frase?", type:"text", required:true, maps_to:["idea.statement"]},
+          {id:"q02", prompt:"Qual problema real ela resolve?", type:"text", required:true, maps_to:["idea.problem"]},
+          {id:"q03", prompt:"Para quem ela resolve esse problema?", type:"text", required:true, maps_to:["idea.audience"]},
+          {id:"q04", prompt:"Se isso desse certo, o que mudaria na prática?", type:"text", required:true, maps_to:["idea.impact"]},
+          {id:"q05", prompt:"Qual valor gerado? (dinheiro, tempo, escala, redução de erro, experiência)", type:"multi_select",
+            options:["Dinheiro","Tempo","Escala","Redução de erro","Experiência","Outro"], required:true, maps_to:["idea.value_types"]
+          }
+        ]},
+        { id:"stage_02", title:"Resultado", goal:"Definir critério de pronto e métricas.", questions:[
+          {id:"q06", prompt:"Como será o cenário perfeito quando isso estiver pronto?", type:"text", required:true, maps_to:["result.ideal_state"]},
+          {id:"q07", prompt:"O que precisa estar funcionando para você dizer: “Está entregue”?", type:"text", required:true, maps_to:["result.definition_of_done"]},
+          {id:"q08", prompt:"Esse resultado é mensurável? Como?", type:"text", required:true, maps_to:["result.measurement"]},
+          {id:"q09", prompt:"Em quanto tempo, no máximo, isso precisa estar pronto? (dias)", type:"number", min:1, required:true, maps_to:["planning.deadline_days_max"]},
+          {id:"q10", prompt:"O que acontece se atrasar?", type:"text", required:false, maps_to:["risk.delay_consequence"]}
+        ]},
+        { id:"stage_03", title:"Classificação", goal:"Dizer se é tarefa ou projeto.", questions:[
+          {id:"q11", prompt:"Isso pode ser feito em até 2 horas?", type:"single_select", options:["Sim","Não"], required:true, maps_to:["classification.is_under_2h"]},
+          {id:"q12", prompt:"Isso depende de outras coisas para começar?", type:"single_select", options:["Não","Sim"], required:true, maps_to:["classification.has_dependencies"]},
+          {id:"q13", prompt:"Quantas etapas principais você enxerga agora? (aprox.)", type:"number", min:1, required:true, maps_to:["classification.estimated_phases_count"]}
+        ]},
+        { id:"stage_04", title:"Marcos", goal:"Fases e gates (se for projeto).", showIf: { path:"classification.item_type", eq:"projeto" }, questions:[
+          {id:"q14", prompt:"Quais são as grandes fases até chegar no resultado final? (1 item por linha)", type:"list_text", required:true, maps_to:["plan.milestones"]},
+          {id:"q15", prompt:"O que precisa estar pronto antes de ir para a próxima fase?", type:"text", required:false, maps_to:["plan.phase_gates"]},
+          {id:"q16", prompt:"Qual fase gera mais risco?", type:"text", required:false, maps_to:["risk.highest_risk_phase"]},
+          {id:"q17", prompt:"Qual fase gera mais valor?", type:"text", required:false, maps_to:["value.highest_value_phase"]}
+        ]},
+        { id:"stage_05", title:"Tarefas Atômicas", goal:"Próximas ações executáveis.", questions:[
+          {id:"q18", prompt:"Qual é o primeiro passo físico que você pode executar?", type:"text", required:true, maps_to:["tasks.first_next_action"]},
+          {id:"q19", prompt:"Qual é o segundo passo?", type:"text", required:false, maps_to:["tasks.second_next_action"]},
+          {id:"q20", prompt:"O que você faria se tivesse só 1 hora hoje para avançar?", type:"text", required:true, maps_to:["tasks.one_hour_action"]},
+          {id:"q21", prompt:"O que pode ser feito em paralelo? (1 item por linha)", type:"list_text", required:false, maps_to:["tasks.parallelizable"]},
+          {id:"q22", prompt:"O que depende de validação para seguir? (1 item por linha)", type:"list_text", required:false, maps_to:["tasks.requires_validation"]}
+        ]},
+        { id:"stage_06", title:"Prioridade & Ritmo", goal:"Capacidade e prazo realista.", questions:[
+          {id:"q23", prompt:"Esse projeto é prioridade alta, média ou baixa?", type:"single_select", options:["Alta","Média","Baixa"], required:true, maps_to:["planning.priority"]},
+          {id:"q24", prompt:"Quantas horas por dia você consegue dedicar a isso?", type:"number", min:0.5, required:true, maps_to:["planning.hours_per_day"]},
+          {id:"q25", prompt:"Em quantos dias realistas você acha que dá para entregar?", type:"number", min:1, required:true, maps_to:["planning.deadline_days_realistic"]},
+          {id:"q26", prompt:"O que acontece se você não trabalhar nisso por 1 semana?", type:"text", required:false, maps_to:["risk.one_week_no_work_consequence"]}
+        ]},
+        { id:"stage_07", title:"Planejamento Semanal", goal:"Definir o foco da semana.", questions:[
+          {id:"q27", prompt:"O que precisa estar pronto até o final desta semana?", type:"text", required:true, maps_to:["weekly.goal"]},
+          {id:"q28", prompt:"Quais 3 tarefas garantem avanço real?", type:"fixed_list_text", count:3, required:true, maps_to:["weekly.top3_tasks"]},
+          {id:"q29", prompt:"Qual é a tarefa mais crítica (MIT) da semana?", type:"text", required:true, maps_to:["weekly.mit"]},
+          {id:"q30", prompt:"O que vai travar se essa tarefa não for feita?", type:"text", required:false, maps_to:["risk.weekly_blocker_if_mit_not_done"]}
+        ]},
+        { id:"stage_08", title:"Execução Diária", goal:"Plano do dia + evidência.", questions:[
+          {id:"q31", prompt:"Se hoje só uma coisa puder ser feita, qual é?", type:"text", required:true, maps_to:["daily.mit"]},
+          {id:"q32", prompt:"Quanto tempo de foco isso exige? (minutos)", type:"number", min:15, required:true, maps_to:["daily.focus_minutes"]},
+          {id:"q33", prompt:"Qual é o próximo passo imediatamente após concluir essa tarefa?", type:"text", required:true, maps_to:["daily.next_step_after_mit"]},
+          {id:"q34", prompt:"O que pode ser delegado ou automatizado? (1 item por linha)", type:"list_text", required:false, maps_to:["daily.delegable_or_automatable"]},
+          {id:"q35", prompt:"Qual evidência mostrará que o dia foi produtivo?", type:"text", required:true, maps_to:["daily.evidence_of_progress"]}
+        ]},
+        { id:"stage_09", title:"Controle & Insight", goal:"Risco, sinais e KPI.", questions:[
+          {id:"q36", prompt:"O que pode dar errado primeiro?", type:"text", required:true, maps_to:["risk.first_failure_mode"]},
+          {id:"q37", prompt:"Como você vai perceber isso cedo?", type:"text", required:true, maps_to:["risk.early_warning_signal"]},
+          {id:"q38", prompt:"Que indicador mostra progresso real?", type:"text", required:true, maps_to:["metrics.progress_kpi"]},
+          {id:"q39", prompt:"O que você ajustaria se tivesse que acelerar 30%?", type:"text", required:false, maps_to:["optimization.accelerate_30_percent"]},
+          {id:"q40", prompt:"O que você eliminaria se tivesse que cortar 30% do esforço?", type:"text", required:false, maps_to:["optimization.cut_30_percent_effort"]}
+        ]}
+      ]
+    }
+  };
+
+  const DATA_MODEL = () => ({
+    idea:{statement:"",problem:"",audience:"",impact:"",value_types:[]},
+    result:{ideal_state:"",definition_of_done:"",measurement:""},
+    classification:{is_under_2h:"",has_dependencies:"",estimated_phases_count:0,item_type:""},
+    plan:{milestones:[],phase_gates:""},
+    tasks:{first_next_action:"",second_next_action:"",one_hour_action:"",parallelizable:[],requires_validation:[]},
+    planning:{priority:"",hours_per_day:0,deadline_days_max:0,deadline_days_realistic:0},
+    weekly:{goal:"",top3_tasks:["","",""],mit:""},
+    daily:{mit:"",focus_minutes:0,next_step_after_mit:"",delegable_or_automatable:[],evidence_of_progress:""},
+    metrics:{progress_kpi:""},
+    risk:{
+      delay_consequence:"",one_week_no_work_consequence:"",
+      highest_risk_phase:"",highest_value_phase:"",
+      weekly_blocker_if_mit_not_done:"",
+      first_failure_mode:"",early_warning_signal:""
+    },
+    value:{highest_value_phase:""},
+    optimization:{accelerate_30_percent:"",cut_30_percent_effort:""}
+  });
+
+  // =========================
+  // 2) Estado: sem questões guardadas
+  //    - Guarda apenas: projetos + histórico + gamificação
+  // =========================
+  const LS_KEY = "m2d_state_v2";
+
+  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+  function todayISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+  function daysBetween(aISO,bISO){ const a=new Date(aISO+"T00:00:00"); const b=new Date(bISO+"T00:00:00"); return Math.round((b-a)/(1000*60*60*24)); }
+  function getLevelFromXP(xp){
+    let lvl=1; while((lvl+1)*(lvl+1)*100<=xp) lvl++;
+    const cur=lvl*lvl*100, next=(lvl+1)*(lvl+1)*100;
+    const progress=(xp-cur)/(next-cur);
+    return {lvl, progress: Math.max(0,Math.min(1,progress))};
+  }
+
+  function defaultState(){
+    return {
+      xp:0,
+      streak:0,
+      lastCheckin:null,
+      projects:[],               // [{id, created_at, title, answers, stageDone, stageDoneAt, history:[]}]
+      activeProjectId:null,
+      log:[]
+    };
+  }
+
+  let state = loadState();
+  let activeTab = "dashboard";
+
+  function loadState(){
+    try{
+      const raw=localStorage.getItem(LS_KEY);
+      if(!raw) return defaultState();
+      return Object.assign(defaultState(), JSON.parse(raw));
+    }catch(e){ return defaultState(); }
+  }
+  function saveState(){
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    addLog("Salvo ✅");
+    render();
+  }
+
+  function addLog(msg){
+    const ts=new Date().toLocaleString("pt-BR");
+    state.log.unshift({ts,msg});
+    state.log=state.log.slice(0,80);
+  }
+
+  function grantXP(amount, reason){
+    state.xp += amount;
+    addLog(`+${amount} XP • ${reason}`);
+  }
+
+  function dailyCheckin(){
+    const t=todayISO();
+    if(state.lastCheckin===t){ addLog("Check-in já feito hoje ✅"); render(); return; }
+    if(!state.lastCheckin) state.streak=1;
+    else{
+      const diff=daysBetween(state.lastCheckin,t);
+      state.streak = (diff===1) ? state.streak+1 : 1;
+    }
+    state.lastCheckin=t;
+    grantXP(15,"Check-in diário");
+    const bonus=Math.min(100, 10*state.streak);
+    grantXP(bonus, `Bônus de streak (${state.streak} dias)`);
+    // salva evento no histórico do projeto ativo (se houver)
+    const p = getActiveProject();
+    if(p){
+      p.history.unshift({at:new Date().toISOString(), type:"checkin", note:`Check-in ${t}`, streak:state.streak});
+      p.history = p.history.slice(0,300);
+    }
+    render();
+  }
+
+  function getActiveProject(){
+    return state.projects.find(p => p.id === state.activeProjectId) || null;
+  }
+
+  // Derived: classification.item_type
+  function applyDerived(answers){
+    answers.classification.item_type = (answers.classification.is_under_2h === "Sim") ? "tarefa" : "projeto";
+  }
+
+  // Helpers path
+  function getByPath(obj, path){
+    const parts=path.split(".");
+    let cur=obj;
+    for(const p of parts){ if(cur==null) return undefined; cur=cur[p]; }
+    return cur;
+  }
+  function setByPath(obj, path, value){
+    const parts=path.split(".");
+    let cur=obj;
+    for(let i=0;i<parts.length-1;i++){
+      const k=parts[i];
+      if(!(k in cur)) cur[k]={};
+      cur=cur[k];
+    }
+    cur[parts[parts.length-1]]=value;
+  }
+
+  function isFilled(val){
+    if(val==null) return false;
+    if(Array.isArray(val)) return val.length>0 && val.some(x => String(x).trim().length>0);
+    if(typeof val==="number") return !Number.isNaN(val) && val!==0;
+    return String(val).trim().length>0;
+  }
+
+  function stageVisible(stage, answers){
+    if(!stage.showIf) return true;
+    const cur = getByPath(answers, stage.showIf.path);
+    return cur === stage.showIf.eq;
+  }
+
+  function stageCompletion(stage, answers){
+    const req = stage.questions.filter(q=>q.required);
+    if(req.length===0) return 1;
+    let ok=0;
+    for(const q of req){
+      const path=q.maps_to?.[0];
+      const v=getByPath(answers, path);
+      if(isFilled(v)) ok++;
+    }
+    return ok/req.length;
+  }
+
+  function overallCompletion(answers){
+    const stages = FLOW.flow.stages.filter(s => stageVisible(s, answers));
+    if(stages.length===0) return 0;
+    return stages.reduce((sum,s)=>sum+stageCompletion(s,answers),0)/stages.length;
+  }
+
+  // =========================
+  // 3) Tabs (sem perguntas por etapa)
+  // =========================
+  const TABS = [
+    {id:"dashboard", label:"Dashboard"},
+    {id:"projeto", label:"Projeto"},
+    {id:"rotina", label:"Rotina diária"},
+    {id:"historico", label:"Histórico"}
+  ];
+
+  // =========================
+  // 4) Wizard "Nova ideia?"
+  // =========================
+  const wizardBack = document.getElementById("wizardBack");
+  const wizardBody = document.getElementById("wizardBody");
+  const wizardSubtitle = document.getElementById("wizardSubtitle");
+  const wizPrev = document.getElementById("wizPrev");
+  const wizNext = document.getElementById("wizNext");
+  const wizClose = document.getElementById("wizClose");
+  const wizSaveDraft = document.getElementById("wizSaveDraft");
+  const wizFinish = document.getElementById("wizFinish");
+
+  let wizardStep = 0;
+  let wizardDraft = null;     // answers (data_model)
+  let wizardMode = "create";  // "create" ou "update"
+
+  function openWizard(mode){
+    wizardMode = mode || "create";
+    wizardStep = 0;
+
+    const p = getActiveProject();
+    wizardDraft = (wizardMode==="update" && p) ? deepClone(p.answers) : DATA_MODEL();
+    applyDerived(wizardDraft);
+
+    wizardBack.style.display = "flex";
+    renderWizard();
+  }
+
+  function closeWizard(){
+    wizardBack.style.display = "none";
+  }
+
+  function visibleWizardStages(){
+    applyDerived(wizardDraft);
+    return FLOW.flow.stages.filter(s => stageVisible(s, wizardDraft));
+  }
+
+  function renderWizard(){
+    const stages = visibleWizardStages();
+    const stage = stages[wizardStep] || stages[0];
+
+    wizardSubtitle.textContent = `${wizardMode==="create" ? "Criando" : "Atualizando"} • Etapa ${wizardStep+1}/${stages.length}: ${stage.title}`;
+
+    wizardBody.innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div style="font-weight:900">${escapeHtml(stage.title)}</div>
+          <div class="muted small">${escapeHtml(stage.goal || "")}</div>
+        </div>
+        <div class="pill">Obrigatórios: ${Math.round(stageCompletion(stage, wizardDraft)*100)}%</div>
+      </div>
+      <div class="bar" style="margin-top:10px"><i style="width:${Math.round(stageCompletion(stage, wizardDraft)*100)}%"></i></div>
+      <div class="sep"></div>
+      ${stage.questions.map(q => renderWizardQuestion(q)).join("")}
+    `;
+
+    // wire inputs
+    wireWizardInputs();
+
+    wizPrev.disabled = wizardStep === 0;
+    wizNext.disabled = wizardStep >= stages.length - 1;
+  }
+
+  function renderWizardQuestion(q){
+    const path = q.maps_to?.[0];
+    const id = "wiz_" + q.id;
+    const required = q.required ? " <span class='muted small'>(obrigatório)</span>" : "";
+    const current = path ? getByPath(wizardDraft, path) : "";
+
+    if(q.type==="text"){
+      return `
+        <div class="q">
+          <label for="${id}">${escapeHtml(q.prompt)}${required}</label>
+          <textarea id="${id}" data-path="${escapeHtml(path||"")}">${escapeHtml(String(current ?? ""))}</textarea>
+        </div>
+      `;
+    }
+    if(q.type==="number"){
+      return `
+        <div class="q">
+          <label for="${id}">${escapeHtml(q.prompt)}${required}</label>
+          <input id="${id}" type="number" step="0.5" min="${q.min ?? ""}" value="${escapeHtml(String(current ?? ""))}" data-path="${escapeHtml(path||"")}" />
+        </div>
+      `;
+    }
+    if(q.type==="single_select"){
+      const opts=(q.options||[]).map(opt=>{
+        const sel=(current===opt)?"selected":"";
+        return `<option ${sel}>${escapeHtml(opt)}</option>`;
+      }).join("");
+      return `
+        <div class="q">
+          <label for="${id}">${escapeHtml(q.prompt)}${required}</label>
+          <select id="${id}" data-path="${escapeHtml(path||"")}">
+            <option value="">Selecione…</option>
+            ${opts}
+          </select>
+        </div>
+      `;
+    }
+    if(q.type==="multi_select"){
+      const curArr=Array.isArray(current)?current:[];
+      const tags=(q.options||[]).map(opt=>{
+        const on=curArr.includes(opt);
+        return `<span class="tag ${on?"on":""}" data-opt="${escapeHtml(opt)}" data-path="${escapeHtml(path||"")}">${escapeHtml(opt)}</span>`;
+      }).join("");
+      return `
+        <div class="q">
+          <label>${escapeHtml(q.prompt)}${required}</label>
+          <div class="listbox">${tags}</div>
+          <div class="muted small" style="margin-top:8px">Clique para marcar/desmarcar.</div>
+        </div>
+      `;
+    }
+    if(q.type==="list_text"){
+      const cur=Array.isArray(current)?current.join("\n"):"";
+      return `
+        <div class="q">
+          <label for="${id}">${escapeHtml(q.prompt)}${required}</label>
+          <textarea id="${id}" placeholder="1 item por linha" data-list="true" data-path="${escapeHtml(path||"")}">${escapeHtml(cur)}</textarea>
+          <div class="muted small" style="margin-top:8px">Dica: 1 item por linha.</div>
+        </div>
+      `;
+    }
+    if(q.type==="fixed_list_text"){
+      const count=q.count||3;
+      const curArr=Array.isArray(current)?current:Array(count).fill("");
+      const inputs=Array.from({length:count}).map((_,i)=>`
+        <input type="text" value="${escapeHtml(String(curArr[i] ?? ""))}" data-fixed-index="${i}" data-path="${escapeHtml(path||"")}" placeholder="Item ${i+1}" />
+      `).join("");
+      return `
+        <div class="q">
+          <label>${escapeHtml(q.prompt)}${required}</label>
+          <div class="two">${inputs}</div>
+        </div>
+      `;
+    }
+    return `<div class="q"><label>${escapeHtml(q.prompt)}${required}</label><div class="muted small">Tipo não suportado: ${escapeHtml(q.type)}</div></div>`;
+  }
+
+    function pathsEqualOrChild(changedPath, watchedPath){
+        // true se changedPath == watchedPath ou se changedPath começa com watchedPath + "."
+        return changedPath === watchedPath || changedPath.startsWith(watchedPath + ".");
+    }
+
+    let wizardRerenderTimer = null;
+    function scheduleWizardRerender(){
+        clearTimeout(wizardRerenderTimer);
+        wizardRerenderTimer = setTimeout(() => {
+        // re-render apenas quando necessário
+        renderWizard();
+        }, 50);
+    }
+
+    // Agora substitua a função wireWizardInputs() inteira por esta:
+    function wireWizardInputs(){
+        wizardBody.querySelectorAll("textarea[data-path], input[data-path], select[data-path]").forEach(el=>{
+        el.addEventListener("input", ()=>{
+            const path = el.getAttribute("data-path");
+            if(!path) return;
+
+            // Atualiza o draft sem re-render completo
+            if(el.tagName==="TEXTAREA" && el.getAttribute("data-list")==="true"){
+            const lines = el.value.split("\n").map(s=>s.trim()).filter(Boolean);
+            setByPath(wizardDraft, path, lines);
+            }else if(el.hasAttribute("data-fixed-index")){
+            const idx = Number(el.getAttribute("data-fixed-index"));
+            const cur = getByPath(wizardDraft, path);
+            const arr = Array.isArray(cur) ? cur.slice() : [];
+            arr[idx] = el.value;
+            setByPath(wizardDraft, path, arr);
+            }else if(el.type==="number"){
+            const v = el.value==="" ? 0 : Number(el.value);
+            setByPath(wizardDraft, path, v);
+            }else{
+            setByPath(wizardDraft, path, el.value);
+            }
+
+            // Aplica derived (tarefa/projeto)
+            const beforeType = wizardDraft.classification.item_type;
+            applyDerived(wizardDraft);
+            const afterType = wizardDraft.classification.item_type;
+
+            // ✅ Só re-renderiza se isso afetar a visibilidade (ex.: troca tarefa/projeto)
+            // ou se você editar campos que mudam bastante a estrutura.
+            if(pathsEqualOrChild(path, "classification.is_under_2h") || beforeType !== afterType){
+            scheduleWizardRerender();
+            } else {
+            // sem re-render: você continua digitando normal
+            // (opcional) aqui você poderia atualizar só um contador de progresso, se quiser
+            }
+        });
+        });
+
+        // multi_select tags: aqui faz sentido re-renderizar (clique único, sem digitação)
+        wizardBody.querySelectorAll(".tag[data-path][data-opt]").forEach(tag=>{
+        tag.addEventListener("click", ()=>{
+            const path=tag.getAttribute("data-path");
+            const opt=tag.getAttribute("data-opt");
+            const cur=getByPath(wizardDraft, path);
+            const arr=Array.isArray(cur)?cur.slice():[];
+            const idx=arr.indexOf(opt);
+            if(idx>=0) arr.splice(idx,1); else arr.push(opt);
+            setByPath(wizardDraft, path, arr);
+
+            applyDerived(wizardDraft);
+            renderWizard(); // ok aqui
+        });
+        });
+    }
+
+
+  function wizardRequiredOk(){
+    const stages = visibleWizardStages();
+    for(const st of stages){
+      const req = st.questions.filter(q=>q.required);
+      for(const q of req){
+        const path=q.maps_to?.[0];
+        const v=getByPath(wizardDraft, path);
+        if(!isFilled(v)) return false;
+      }
+    }
+    return true;
+  }
+
+  function wizardFinish(){
+    applyDerived(wizardDraft);
+
+    if(!wizardRequiredOk()){
+      addLog("Ainda faltam campos obrigatórios no wizard ⚠️");
+      renderWizard();
+      render();
+      return;
+    }
+
+    const nowISO = new Date().toISOString();
+
+    if(wizardMode==="update" && getActiveProject()){
+      const p=getActiveProject();
+      p.answers = deepClone(wizardDraft);
+      p.title = (wizardDraft.idea.statement || "Projeto").slice(0,80);
+      p.history.unshift({at: nowISO, type:"project_update", note:"Projeto atualizado via wizard"});
+      grantXP(50, "Marco: Projeto atualizado (wizard)");
+    }else{
+      const id="p_" + Math.random().toString(16).slice(2) + "_" + Date.now();
+      const project={
+        id,
+        created_at: nowISO,
+        title: (wizardDraft.idea.statement || "Nova ideia").slice(0,80),
+        answers: deepClone(wizardDraft),
+        stageDone:{},
+        stageDoneAt:{},
+        history:[
+          {at: nowISO, type:"project_created", note:"Projeto criado via wizard"}
+        ]
+      };
+      state.projects.unshift(project);
+      state.activeProjectId = id;
+      grantXP(50, "Marco: Projeto criado");
+    }
+
+    closeWizard();
+    saveState();
+    render();
+  }
+
+  wizPrev.onclick = ()=>{ wizardStep = Math.max(0, wizardStep-1); renderWizard(); };
+  wizNext.onclick = ()=>{
+    const stages = visibleWizardStages();
+    wizardStep = Math.min(stages.length-1, wizardStep+1);
+    renderWizard();
+  };
+  wizClose.onclick = ()=> closeWizard();
+  wizSaveDraft.onclick = ()=>{
+    addLog("Rascunho do wizard salvo (fica só na memória até finalizar) ✍️");
+    render();
+  };
+  wizFinish.onclick = ()=> wizardFinish();
+
+  // =========================
+  // 5) Dashboard / Projeto / Rotina / Histórico
+  // =========================
+  const elTabs=document.getElementById("tabs");
+  const elMain=document.getElementById("mainCard");
+  const elKpis=document.getElementById("kpis");
+  const elLvl=document.getElementById("lvl");
+  const elXP=document.getElementById("xp");
+  const elStreak=document.getElementById("streak");
+  const elLevelBar=document.getElementById("levelBar");
+  const elLog=document.getElementById("log");
+  const elCheckinInfo=document.getElementById("checkinInfo");
+  const elActiveProject=document.getElementById("activeProject");
+
+  function renderTabs(){
+    elTabs.innerHTML="";
+    TABS.forEach(t=>{
+      const b=document.createElement("button");
+      b.className="tab"+(activeTab===t.id?" active":"");
+      b.textContent=t.label;
+      b.onclick=()=>{ activeTab=t.id; render(); };
+      elTabs.appendChild(b);
+    });
+  }
+
+  function renderKpis(){
+    const p=getActiveProject();
+    if(!p){
+      elKpis.innerHTML = `
+        <div class="kpi"><b>0%</b><span>Progresso geral</span><div class="bar"><i style="width:0%"></i></div></div>
+        <div class="kpi"><b>0</b><span>Projetos</span><div class="bar"><i style="width:0%"></i></div></div>
+        <div class="kpi"><b>—</b><span>Status</span><div class="bar"><i style="width:0%"></i></div></div>
+      `;
+      return;
+    }
+    const prog=overallCompletion(p.answers);
+    const pct=Math.round(prog*100);
+
+    const risk = pct>=70 ? "No prazo" : (pct>=40 ? "Atenção" : "Em risco");
+    const w = pct>=70 ? pct : (pct>=40 ? pct : pct);
+
+    elKpis.innerHTML = `
+      <div class="kpi"><b>${pct}%</b><span>Progresso do projeto</span><div class="bar"><i style="width:${pct}%"></i></div></div>
+      <div class="kpi"><b>${state.projects.length}</b><span>Projetos (total)</span><div class="bar"><i style="width:${Math.min(100, state.projects.length*10)}%"></i></div></div>
+      <div class="kpi"><b>${escapeHtml(risk)}</b><span>Status (heurístico)</span><div class="bar"><i style="width:${w}%"></i></div></div>
+    `;
+  }
+
+  function renderGamification(){
+    const info=getLevelFromXP(state.xp);
+    elLvl.textContent=info.lvl;
+    elXP.textContent=state.xp.toLocaleString("pt-BR");
+    elStreak.textContent=`${state.streak} dias`;
+    elLevelBar.style.width=`${Math.round(info.progress*100)}%`;
+
+    const t=todayISO();
+    elCheckinInfo.textContent = (state.lastCheckin===t) ? `Check-in OK (${t})` : `Sem check-in hoje (${t})`;
+
+    const p=getActiveProject();
+    elActiveProject.textContent = p ? p.title : "—";
+  }
+
+  function renderLog(){
+    elLog.innerHTML = state.log.length
+      ? state.log.map(x=>`<div><span class="muted small">${escapeHtml(x.ts)}</span><br>${escapeHtml(x.msg)}</div>`).join("")
+      : `<div class="muted">Sem eventos ainda.</div>`;
+  }
+
+  function renderDashboard(){
+    const p=getActiveProject();
+    if(!p){
+      elMain.innerHTML = `
+        <h2>Dashboard</h2>
+        <p class="muted">Nenhum projeto ainda. Clique em <b>“Nova ideia?”</b> para transformar uma ideia em projeto executável.</p>
+        <div class="sep"></div>
+        <button class="btn primary" onclick="openWizard('create')">Nova ideia?</button>
+      `;
+      return;
+    }
+
+    const a=p.answers;
+    const headline=a.idea.statement || "—";
+    const type=a.classification.item_type || "—";
+    const prio=a.planning.priority || "—";
+    const maxDays=a.planning.deadline_days_max || "—";
+    const realDays=a.planning.deadline_days_realistic || "—";
+    const kpi=a.metrics.progress_kpi || "—";
+    const prog=Math.round(overallCompletion(a)*100);
+
+    elMain.innerHTML = `
+      <h2>Dashboard</h2>
+      <p class="muted">Visão do projeto ativo + próximos passos (sem exibir perguntas).</p>
+
+      <div class="sep"></div>
+
+      <div class="two">
+        <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+          <div class="muted small">Projeto ativo</div>
+          <div style="font-size:16px;font-weight:900;margin-top:4px">${escapeHtml(headline)}</div>
+          <div class="row" style="margin-top:10px">
+            <span class="pill">Tipo: <b style="color:var(--text)">${escapeHtml(type)}</b></span>
+            <span class="pill">Prioridade: <b style="color:var(--text)">${escapeHtml(prio)}</b></span>
+            <span class="pill">Prazo máx: <b style="color:var(--text)">${escapeHtml(String(maxDays))} dias</b></span>
+            <span class="pill">Prazo real: <b style="color:var(--text)">${escapeHtml(String(realDays))} dias</b></span>
+          </div>
+        </div>
+
+        <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+          <div class="muted small">Progresso & KPI</div>
+          <div style="font-size:16px;font-weight:900;margin-top:4px">${escapeHtml(kpi)}</div>
+          <div class="sep"></div>
+          <div class="mini"><b>Progresso</b><span>${prog}%</span></div>
+          <div class="bar"><i style="width:${prog}%"></i></div>
+          <div class="sep"></div>
+          <div class="row">
+            <button class="btn" onclick="dailyCheckin()">Check-in diário</button>
+            <button class="btn primary" onclick="openWizard('update')">Atualizar projeto (perguntas)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+        <div class="muted small">Próximo foco recomendado (do próprio projeto)</div>
+        <div class="row" style="justify-content:space-between;margin-top:10px">
+          <div>
+            <div style="font-weight:900">MIT do dia:</div>
+            <div class="muted">${escapeHtml(a.daily.mit || "Defina no wizard (Execução Diária)")}</div>
+            <div style="margin-top:8px;font-weight:900">Meta da semana:</div>
+            <div class="muted">${escapeHtml(a.weekly.goal || "Defina no wizard (Planejamento Semanal)")}</div>
+          </div>
+          <button class="btn primary" onclick="activeTab='rotina'; render();">Ir para Rotina</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderProjeto(){
+    const p=getActiveProject();
+    if(!p){
+      elMain.innerHTML = `
+        <h2>Projeto</h2>
+        <p class="muted">Crie um projeto primeiro em “Nova ideia?”.</p>
+        <button class="btn primary" onclick="openWizard('create')">Nova ideia?</button>
+      `;
+      return;
+    }
+    const a=p.answers;
+    const prog=Math.round(overallCompletion(a)*100);
+
+    elMain.innerHTML = `
+      <h2>Projeto</h2>
+      <p class="muted">Resumo do projeto (sem perguntas). Edite pelo wizard.</p>
+
+      <div class="sep"></div>
+
+      <div class="two">
+        <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+          <div class="muted small">Clareza</div>
+          <div><b>Ideia:</b> ${escapeHtml(a.idea.statement || "—")}</div>
+          <div><b>Problema:</b> ${escapeHtml(a.idea.problem || "—")}</div>
+          <div><b>Público:</b> ${escapeHtml(a.idea.audience || "—")}</div>
+          <div><b>Impacto:</b> ${escapeHtml(a.idea.impact || "—")}</div>
+          <div><b>Valor:</b> ${escapeHtml((a.idea.value_types||[]).join(", ") || "—")}</div>
+        </div>
+
+        <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+          <div class="muted small">Resultado</div>
+          <div><b>Ideal:</b> ${escapeHtml(a.result.ideal_state || "—")}</div>
+          <div><b>Done:</b> ${escapeHtml(a.result.definition_of_done || "—")}</div>
+          <div><b>Métrica:</b> ${escapeHtml(a.result.measurement || "—")}</div>
+          <div class="sep"></div>
+          <div class="mini"><b>Progresso geral</b><span>${prog}%</span></div>
+          <div class="bar"><i style="width:${prog}%"></i></div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+        <div class="muted small">Marcos</div>
+        <div>${(a.plan.milestones||[]).length ? `<ul>${a.plan.milestones.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>` : `<div class="muted">—</div>`}</div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row">
+        <button class="btn primary" onclick="openWizard('update')">Editar projeto (perguntas)</button>
+        <button class="btn" onclick="switchProjectUI()">Trocar projeto</button>
+      </div>
+    `;
+  }
+
+  function renderRotina(){
+    const p=getActiveProject();
+    if(!p){
+      elMain.innerHTML = `
+        <h2>Rotina diária</h2>
+        <p class="muted">Crie um projeto primeiro em “Nova ideia?”.</p>
+        <button class="btn primary" onclick="openWizard('create')">Nova ideia?</button>
+      `;
+      return;
+    }
+    const a=p.answers;
+    elMain.innerHTML = `
+      <h2>Rotina diária</h2>
+      <p class="muted">Aqui você acompanha o dia. Para alterar campos (MIT, blocos, evidência), use o wizard.</p>
+
+      <div class="sep"></div>
+
+      <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+        <div class="mini"><b>MIT (hoje)</b><span>${escapeHtml(a.daily.mit || "—")}</span></div>
+        <div class="mini"><b>Foco</b><span>${escapeHtml(String(a.daily.focus_minutes || 0))} min</span></div>
+        <div class="sep"></div>
+        <div><b>Próximo passo:</b> ${escapeHtml(a.daily.next_step_after_mit || "—")}</div>
+        <div style="margin-top:8px"><b>Evidência:</b> ${escapeHtml(a.daily.evidence_of_progress || "—")}</div>
+        <div style="margin-top:8px"><b>Delegável/Automatizável:</b> ${escapeHtml((a.daily.delegable_or_automatable||[]).join(", ") || "—")}</div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row">
+        <button class="btn" onclick="dailyCheckin()">Check-in diário (+XP)</button>
+        <button class="btn primary" onclick="openWizard('update')">Atualizar rotina (wizard)</button>
+      </div>
+    `;
+  }
+
+  function renderHistorico(){
+    const p=getActiveProject();
+    if(!p){
+      elMain.innerHTML = `
+        <h2>Histórico</h2>
+        <p class="muted">Crie um projeto primeiro em “Nova ideia?”.</p>
+        <button class="btn primary" onclick="openWizard('create')">Nova ideia?</button>
+      `;
+      return;
+    }
+    const items = p.history || [];
+    elMain.innerHTML = `
+      <h2>Histórico</h2>
+      <p class="muted">Aqui fica o histórico de avanço separado (check-ins, criação, updates, etc.).</p>
+
+      <div class="sep"></div>
+
+      <div class="card" style="padding:12px;background:#0c121c;border-radius:12px;border:1px solid var(--line)">
+        ${items.length ? items.slice(0,80).map(ev=>`
+          <div style="padding:10px 0;border-bottom:1px dashed #1b2737">
+            <div class="muted small">${escapeHtml(new Date(ev.at).toLocaleString("pt-BR"))}</div>
+            <div><b>${escapeHtml(ev.type)}</b> • ${escapeHtml(ev.note || "")}</div>
+            ${ev.streak ? `<div class="muted small">streak: ${escapeHtml(String(ev.streak))}</div>` : ``}
+          </div>
+        `).join("") : `<div class="muted">Sem histórico ainda.</div>`}
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row">
+        <button class="btn" onclick="dailyCheckin()">Check-in diário</button>
+        <button class="btn primary" onclick="openWizard('update')">Atualizar projeto (wizard)</button>
+      </div>
+    `;
+  }
+
+  function switchProjectUI(){
+    if(state.projects.length<=1){ addLog("Não há outro projeto para trocar."); render(); return; }
+    const list = state.projects.map((p,i)=>`${i+1}) ${p.title}`).join("\n");
+    const pick = prompt("Escolha o número do projeto:\n\n"+list);
+    const idx = Number(pick)-1;
+    if(Number.isNaN(idx) || idx<0 || idx>=state.projects.length) return;
+    state.activeProjectId = state.projects[idx].id;
+    addLog(`Projeto ativo: ${state.projects[idx].title}`);
+    render();
+  }
+  window.switchProjectUI = switchProjectUI;
+
+  // =========================
+  // 6) Render principal
+  // =========================
+  function render(){
+    renderTabs();
+    renderKpis();
+    renderGamification();
+    renderLog();
+
+    if(activeTab==="dashboard") renderDashboard();
+    else if(activeTab==="projeto") renderProjeto();
+    else if(activeTab==="rotina") renderRotina();
+    else if(activeTab==="historico") renderHistorico();
+  }
+
+  // =========================
+  // 7) Export / Import / Reset
+  // =========================
+  document.getElementById("btnNewIdea").onclick = ()=> openWizard("create");
+  document.getElementById("btnSave").onclick = ()=> saveState();
+  document.getElementById("btnDailyCheckin").onclick = ()=> dailyCheckin();
+
+  document.getElementById("btnReset").onclick = ()=>{
+    if(!confirm("Tem certeza? Isso apaga tudo salvo localmente.")) return;
+    state = defaultState();
+    localStorage.removeItem(LS_KEY);
+    addLog("Reset completo 🧹");
+    activeTab="dashboard";
+    render();
+  };
+
+  document.getElementById("btnExport").onclick = ()=>{
+    const payload = {
+      exported_at: new Date().toISOString(),
+      version: "v2",
+      state
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "mind-to-delivery-export.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    addLog("Exportado 📦");
+    render();
+  };
+
+  document.getElementById("btnImport").onclick = async ()=>{
+    const input=document.createElement("input");
+    input.type="file";
+    input.accept="application/json";
+    input.onchange=async ()=>{
+      const file=input.files[0];
+      if(!file) return;
+      const txt=await file.text();
+      try{
+        const payload=JSON.parse(txt);
+        if(payload?.state){
+          state = Object.assign(defaultState(), payload.state);
+          addLog("Importado ✅");
+          activeTab="dashboard";
+          saveState();
+          render();
+        }else alert("JSON inválido: não encontrei payload.state");
+      }catch(e){
+        alert("Falha ao importar JSON.");
+      }
+    };
+    input.click();
+  };
+
+  // =========================
+  // 8) Utils
+  // =========================
+  function escapeHtml(str){
+    return String(str)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // init
+  addLog("App iniciado 🚀");
+  render();
+</script>
+</body>
+</html>
