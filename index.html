@@ -93,19 +93,89 @@
 
 </head>
 <body>
-<div style="padding:12px;color:#000000">
-  Se você está vendo isso, o HTML carregou.
-</div>
-<div id="authScreen" style="display:none; padding:16px; max-width:520px; margin:40px auto; border:1px solid #223044; border-radius:14px; background:#111823;">
-  <h2 style="margin:0 0 8px 0;">Entrar</h2>
-  <p style="margin:0 0 16px 0; color:#9fb0c3;">Faça login para carregar e salvar seus projetos na nuvem.</p>
+<div id="authScreen" style="display:none; max-width:520px; margin:40px auto; padding:16px;">
+  <div style="border:1px solid #223044; border-radius:14px; background:#111823; padding:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <h2 style="margin:0 0 6px 0;">Entrar</h2>
+        <p style="margin:0; color:#9fb0c3; font-size:12px;">
+          Faça login para carregar e salvar seus projetos na nuvem.
+        </p>
+      </div>
 
-  <button id="btnLoginGoogle" style="padding:10px 12px; border-radius:12px; border:0; background:#6aa9ff; color:#06111f; font-weight:800; cursor:pointer;">
-    Entrar com Google
-  </button>
+      <span id="authModeBadge" class="badge" style="white-space:nowrap;">Modo: Login</span>
+    </div>
 
-  <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
+    <div class="sep"></div>
+
+    <!-- Mensagem -->
+    <p id="authMsg" style="margin:0 0 12px 0; color:#9fb0c3; font-size:12px;"></p>
+
+    <!-- Campos comuns -->
+    <div class="q" style="margin:0 0 10px 0;">
+      <label for="authEmail">Email</label>
+      <input id="authEmail" type="text" placeholder="seuemail@exemplo.com" autocomplete="email" />
+    </div>
+
+    <div class="q" style="margin:0 0 10px 0;">
+      <label for="authPassword">Senha</label>
+      <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+      <div class="muted small" style="margin-top:8px;">
+        Dica: use pelo menos 8 caracteres.
+      </div>
+    </div>
+
+    <div id="authScreen" style="display:none; padding:16px; max-width:520px; margin:40px auto; border:1px solid #223044; border-radius:14px; background:#111823;">
+      <h2 style="margin:0 0 8px 0;">Entrar</h2>
+      <p style="margin:0 0 16px 0; color:#9fb0c3;">Faça login para carregar e salvar seus projetos na nuvem.</p>
+
+      <button id="btnLoginGoogle" style="padding:10px 12px; border-radius:12px; border:0; background:#6aa9ff; color:#06111f; font-weight:800; cursor:pointer;">
+        Entrar com Google
+      </button>
+
+      <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
+    </div>
+
+    <!-- Campos do cadastro (escondidos no modo login) -->
+    <div id="signupFields" style="display:none;">
+      <div class="q" style="margin:0 0 10px 0;">
+        <label for="authPassword2">Repetir senha</label>
+        <input id="authPassword2" type="password" placeholder="••••••••" autocomplete="new-password" />
+      </div>
+
+      <div class="q" style="margin:0 0 10px 0;">
+        <label for="authName">Nome</label>
+        <input id="authName" type="text" placeholder="Seu nome" autocomplete="name" />
+      </div>
+
+      <div class="q" style="margin:0 0 10px 0;">
+        <label for="authBirth">Data de nascimento</label>
+        <input id="authBirth" type="date" />
+      </div>
+
+      <div class="q" style="margin:0 0 10px 0;">
+        <label for="authCity">Onde você mora</label>
+        <input id="authCity" type="text" placeholder="Cidade/Estado" autocomplete="address-level2" />
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between; margin-top:12px;">
+      <button class="btn" id="btnToggleAuthMode">Criar conta</button>
+
+      <div class="row">
+        <button class="btn" id="btnForgotPass">Esqueci a senha</button>
+        <button class="btn primary" id="btnAuthSubmit">Entrar</button>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="muted small">
+      Ao continuar, você concorda em usar este app com autenticação via Supabase.
+    </div>
+  </div>
 </div>
+
 
 <div id="appRoot" style="display:none;">
   <header>
@@ -135,6 +205,7 @@
             <button class="btn" id="btnExport">Exportar</button>
             <button class="btn" id="btnImport">Importar</button>
             <button class="btn danger" id="btnReset">Resetar</button>
+            <button class="btn danger" id="btnLogout">Sair</button>
           </div>
           <div class="sep"></div>
           <div class="row">
@@ -236,6 +307,159 @@
   const sb = window.__supabase;
 
 
+  // =========================
+// AUTH UI (Email/Senha + Cadastro no mesmo painel)
+// =========================
+let authMode = "login"; // "login" | "signup"
+
+const authModeBadge = document.getElementById("authModeBadge");
+const btnToggleAuthMode = document.getElementById("btnToggleAuthMode");
+const btnAuthSubmit = document.getElementById("btnAuthSubmit");
+const btnForgotPass = document.getElementById("btnForgotPass");
+
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authPassword2 = document.getElementById("authPassword2");
+const authName = document.getElementById("authName");
+const authBirth = document.getElementById("authBirth");
+const authCity = document.getElementById("authCity");
+const signupFields = document.getElementById("signupFields");
+
+function setAuthMode(mode) {
+  authMode = mode;
+
+  if (authModeBadge) authModeBadge.innerHTML = `Modo: <b>${mode === "login" ? "Login" : "Cadastro"}</b>`;
+  if (btnAuthSubmit) btnAuthSubmit.textContent = mode === "login" ? "Entrar" : "Criar conta";
+  if (btnToggleAuthMode) btnToggleAuthMode.textContent = mode === "login" ? "Criar conta" : "Já tenho conta";
+
+  if (signupFields) signupFields.style.display = mode === "signup" ? "block" : "none";
+
+  // Ajusta autocomplete
+  if (authPassword) authPassword.autocomplete = mode === "signup" ? "new-password" : "current-password";
+
+  // Limpa mensagem
+  showLogin("");
+}
+
+function getTrimmed(el) {
+  return (el?.value ?? "").trim();
+}
+
+function validateAuthInputs() {
+  const email = getTrimmed(authEmail);
+  const pass = authPassword?.value ?? "";
+
+  if (!email || !email.includes("@")) return "Digite um email válido.";
+  if (!pass || pass.length < 8) return "Senha precisa ter pelo menos 8 caracteres.";
+
+  if (authMode === "signup") {
+    const pass2 = authPassword2?.value ?? "";
+    const name = getTrimmed(authName);
+    const birth = authBirth?.value ?? "";
+    const city = getTrimmed(authCity);
+
+    if (!pass2) return "Repita a senha.";
+    if (pass !== pass2) return "As senhas não conferem.";
+    if (!name) return "Digite seu nome.";
+    if (!birth) return "Informe sua data de nascimento.";
+    if (!city) return "Informe onde você mora (Cidade/Estado).";
+  }
+
+  return null;
+}
+
+async function doLoginEmail() {
+  const email = getTrimmed(authEmail);
+  const password = authPassword?.value ?? "";
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    // mensagem mais amigável
+    return showLogin("Falha no login. Verifique email/senha e tente novamente.");
+  }
+}
+
+async function doSignupEmail() {
+  const email = getTrimmed(authEmail);
+  const password = authPassword?.value ?? "";
+
+  const name = getTrimmed(authName);
+  const birth = authBirth?.value ?? "";
+  const city = getTrimmed(authCity);
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        name,
+        birth_date: birth,
+        location: city
+      }
+      // se você configurar confirmação por email, o Supabase pode exigir o clique no link
+    }
+  });
+
+  if (error) {
+    return showLogin("Falha ao criar conta. Tente outro email ou verifique a senha.");
+  }
+
+  // Dependendo das configs do Supabase:
+  // - pode logar direto, ou
+  // - pode exigir confirmação de email
+  showLogin("Conta criada! Se aparecer pedido de confirmação de email, confirme e depois faça login.");
+  setAuthMode("login");
+}
+
+async function handleAuthSubmit() {
+  const err = validateAuthInputs();
+  if (err) return showLogin(err);
+
+  // UI disable
+  if (btnAuthSubmit) btnAuthSubmit.disabled = true;
+
+  try {
+    if (authMode === "login") await doLoginEmail();
+    else await doSignupEmail();
+  } finally {
+    if (btnAuthSubmit) btnAuthSubmit.disabled = false;
+  }
+}
+
+async function handleForgotPassword() {
+  const email = getTrimmed(authEmail);
+  if (!email || !email.includes("@")) return showLogin("Digite seu email acima para recuperar a senha.");
+
+  // IMPORTANTE: você precisa permitir a URL no Supabase (Redirect URLs)
+  const redirectTo = window.location.origin;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) return showLogin("Não consegui enviar o email de recuperação. Tente novamente.");
+  showLogin("Enviei um email de recuperação. Verifique sua caixa de entrada/spam.");
+}
+
+if (btnToggleAuthMode) {
+  btnToggleAuthMode.addEventListener("click", () => {
+    setAuthMode(authMode === "login" ? "signup" : "login");
+  });
+}
+
+if (btnAuthSubmit) btnAuthSubmit.addEventListener("click", handleAuthSubmit);
+if (btnForgotPass) btnForgotPass.addEventListener("click", handleForgotPassword);
+
+// Enter para enviar
+[authEmail, authPassword, authPassword2, authName, authBirth, authCity].forEach(el => {
+  if (!el) return;
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleAuthSubmit();
+  });
+});
+
+// Inicializa modo login
+setAuthMode("login");
+
+
+
   async function loginWithGoogle() {
     const redirectTo = window.location.origin;
     const { error } = await sb.auth.signInWithOAuth({
@@ -246,6 +470,16 @@
   }
 
   if (btnLoginGoogle) btnLoginGoogle.addEventListener("click", loginWithGoogle);
+
+  async function logout() {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error(error);
+    alert("Falha ao sair.");
+    return;
+  }
+  showLogin("Você saiu da conta.");
+}
 
   // ✅ deixa global (pra evitar o erro de “não definido” mesmo se outro script chamar)
   window.bootAuthGate = async function bootAuthGate() {
@@ -1087,6 +1321,9 @@
     document.getElementById("btnNewIdea").onclick = ()=> openWizard("create");
     document.getElementById("btnSave").onclick = ()=> saveState();
     document.getElementById("btnDailyCheckin").onclick = ()=> dailyCheckin();
+    const btnLogout = document.getElementById("btnLogout");
+      if (btnLogout) btnLogout.addEventListener("click", logout);
+
 
     document.getElementById("btnReset").onclick = ()=>{
       if(!confirm("Tem certeza? Isso apaga tudo salvo localmente.")) return;
