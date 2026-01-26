@@ -105,74 +105,82 @@
   <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
 </div>
 
-<div id="appRoot">
+<div id="appRoot" style="display:none;">
   <script>
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+    const SUPABASE_URL = "https://seed-to-fruit.vercel.app/";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpidHRqd3FhbmxwaHNueWVjb2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNjI1NzMsImV4cCI6MjA4NDkzODU3M30.r9ZC1GmID0e7Zrwlck0iXMi5Qa9tsZLaA75S1NF9mvo"
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
+
+// ===== AUTH GATE =====
+const authScreen = document.getElementById("authScreen");
+const appRoot = document.getElementById("appRoot");
+const authMsg = document.getElementById("authMsg");
+const btnLoginGoogle = document.getElementById("btnLoginGoogle");
+
+function showLogin(message = "") {
+  appRoot.style.display = "none";
+  authScreen.style.display = "block";
+  authMsg.textContent = message;
+}
+
+function showApp() {
+  authScreen.style.display = "none";
+  appRoot.style.display = "block";
+}
+
+async function loginWithGoogle() {
+  const redirectTo = window.location.origin;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo }
   });
+  if (error) showLogin("Falha ao abrir login Google.");
+}
 
-  // 2) AUTH GATE (AQUI)
-  const authScreen = document.getElementById("authScreen");
-  const appRoot = document.getElementById("appRoot");
-  const authMsg = document.getElementById("authMsg");
-  const btnLoginGoogle = document.getElementById("btnLoginGoogle");
+btnLoginGoogle.addEventListener("click", loginWithGoogle);
 
-  function showLogin(message="") {
-    appRoot.style.display = "none";
-    authScreen.style.display = "block";
-    authMsg.textContent = message || "";
-  }
-
-  function showApp() {
-    authScreen.style.display = "none";
-    appRoot.style.display = "block";
-  }
-
-  async function loginWithGoogle() {
-    const redirectTo = window.location.origin;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo }
-    });
-    if (error) showLogin("Falha ao abrir login Google.");
-  }
-
-  btnLoginGoogle.addEventListener("click", loginWithGoogle);
-
-  async function bootAuthGate() {
-    const { data: { session } } = await supabase.auth.getSession();
-
+async function bootAuthGate() {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      showLogin("Erro no Auth (getSession). Veja o console.");
+      console.error(error);
+      return;
+    }
     if (!session) {
       showLogin();
       return;
     }
 
-    showApp();
-    const cloudState = await loadStateCloud(); // sua função
-    if (cloudState) state = cloudState;
-
-    render(); // só renderiza o app depois de logado
-  }
-
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (!session) {
-      showLogin(event === "SIGNED_OUT" ? "Você saiu." : "");
-      return;
-    }
-
+    // Logado:
     showApp();
     const cloudState = await loadStateCloud();
     if (cloudState) state = cloudState;
 
     render();
-  });
+  } catch (e) {
+    console.error(e);
+    showLogin("Erro inesperado no Auth Gate. Veja o console.");
+  }
+}
+
+supabase.auth.onAuthStateChange(async (_event, session) => {
+  if (!session) {
+    showLogin();
+    return;
+  }
+  showApp();
+  const cloudState = await loadStateCloud();
+  if (cloudState) state = cloudState;
+  render();
+});
 </script>
   <header>
     <div class="wrap">
@@ -1148,50 +1156,6 @@
     // init
     addLog("App iniciado 🚀");
     bootAuthGate();
-
-  async function loginWithGoogle() {
-  const redirectTo = window.location.origin; // sua URL do Vercel em produção
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo }
-  });
-  if (error) alert("Falha no login Google");
-
-}
-
-  async function loadStateCloud() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("m2d_states")
-    .select("payload")
-    .eq("user_id", user.id)
-    .single();
-
-  if (error) return null;
-  return data?.payload?.state ?? null;
-}
-
-  async function saveStateCloud(state) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const payload = { state, saved_at: new Date().toISOString() };
-
-  const { error } = await supabase
-    .from("m2d_states")
-    .upsert({ user_id: user.id, payload, updated_at: new Date().toISOString() });
-
-  if (error) console.error(error);
-}
-
-  let saveTimer = null;
-  function scheduleCloudSave() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveStateCloud(state), 1000);
-  }
-
 </script>
 </body>
 </html>
