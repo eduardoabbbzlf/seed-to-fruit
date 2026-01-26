@@ -1,18 +1,5 @@
 <!doctype html>
 <html lang="pt-BR">
-
-<div id="authScreen" style="display:none; padding:16px; max-width:520px; margin:40px auto; border:1px solid #223044; border-radius:14px; background:#111823;">
-  <h2 style="margin:0 0 8px 0;">Entrar</h2>
-  <p style="margin:0 0 16px 0; color:#9fb0c3;">Faça login para carregar e salvar seus projetos na nuvem.</p>
-
-  <button id="btnLoginGoogle" style="padding:10px 12px; border-radius:12px; border:0; background:#6aa9ff; color:#06111f; font-weight:800; cursor:pointer;">
-    Entrar com Google
-  </button>
-
-  <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
-</div>
-
-<div id="appRoot" style="display:none;">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -106,7 +93,18 @@
 
 </head>
 <body>
+<div id="authScreen" style="display:none; padding:16px; max-width:520px; margin:40px auto; border:1px solid #223044; border-radius:14px; background:#111823;">
+  <h2 style="margin:0 0 8px 0;">Entrar</h2>
+  <p style="margin:0 0 16px 0; color:#9fb0c3;">Faça login para carregar e salvar seus projetos na nuvem.</p>
 
+  <button id="btnLoginGoogle" style="padding:10px 12px; border-radius:12px; border:0; background:#6aa9ff; color:#06111f; font-weight:800; cursor:pointer;">
+    Entrar com Google
+  </button>
+
+  <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
+</div>
+
+<div id="appRoot" style="display:none;">
   <header>
     <div class="wrap">
       <div class="top">
@@ -206,8 +204,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-
-  
     const SUPABASE_URL = "https://zbttjwqanlphsnyecobh.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpidHRqd3FhbmxwaHNueWVjb2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNjI1NzMsImV4cCI6MjA4NDkzODU3M30.r9ZC1GmID0e7Zrwlck0iXMi5Qa9tsZLaA75S1NF9mvo"
 
@@ -282,6 +278,9 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
   if (cloudState) state = cloudState;
   render();
 });
+
+bootAuthGate();
+showLogin("Teste: se aparecer isso, seu HTML está OK e o problema era JS.");
 </script>
 
   <script>
@@ -1160,7 +1159,6 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
 
     // init
     addLog("App iniciado 🚀");
-    bootAuthGate();
 </script>
 </body>
 </html>
