@@ -233,11 +233,12 @@
     { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
   );
 
-  const supabase = window.__supabase;
+  const sb = window.__supabase;
+
 
   async function loginWithGoogle() {
     const redirectTo = window.location.origin;
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo }
     });
@@ -249,7 +250,7 @@
   // ✅ deixa global (pra evitar o erro de “não definido” mesmo se outro script chamar)
   window.bootAuthGate = async function bootAuthGate() {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await sb.auth.getSession();
       if (error) return showLogin("Erro no Auth (getSession). Veja o console.");
       if (!session) return showLogin();
 
@@ -263,7 +264,7 @@
     }
   };
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  sb.auth.onAuthStateChange((_event, session) => {
     if (!session) return showLogin();
     showApp();
     if (typeof window.render === "function") window.render();
