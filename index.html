@@ -90,8 +90,14 @@
     .listbox{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
     .small{font-size:12px}
   </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<script>
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+</script>
 <header>
   <div class="wrap">
     <div class="top">
@@ -186,6 +192,7 @@
     </div>
   </div>
 </div>
+
 
 <script>
   // =========================
@@ -1064,6 +1071,51 @@
   // init
   addLog("App iniciado 🚀");
   render();
+</script>
+<script>
+  async function loginWithGoogle() {
+  const redirectTo = window.location.origin; // sua URL do Vercel em produção
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo }
+  });
+  if (error) alert("Falha no login Google");
+
+}
+
+  async function loadStateCloud() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("m2d_states")
+    .select("payload")
+    .eq("user_id", user.id)
+    .single();
+
+  if (error) return null;
+  return data?.payload?.state ?? null;
+}
+
+  async function saveStateCloud(state) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const payload = { state, saved_at: new Date().toISOString() };
+
+  const { error } = await supabase
+    .from("m2d_states")
+    .upsert({ user_id: user.id, payload, updated_at: new Date().toISOString() });
+
+  if (error) console.error(error);
+}
+
+  let saveTimer = null;
+  function scheduleCloudSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveStateCloud(state), 1000);
+  }
+
 </script>
 </body>
 </html>
