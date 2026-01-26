@@ -125,10 +125,7 @@
       </div>
     </div>
 
-    <div id="authScreen" style="display:none; padding:16px; max-width:520px; margin:40px auto; border:1px solid #223044; border-radius:14px; background:#111823;">
-      <h2 style="margin:0 0 8px 0;">Entrar</h2>
-      <p style="margin:0 0 16px 0; color:#9fb0c3;">Faça login para carregar e salvar seus projetos na nuvem.</p>
-
+    <div>
       <button id="btnLoginGoogle" style="padding:10px 12px; border-radius:12px; border:0; background:#6aa9ff; color:#06111f; font-weight:800; cursor:pointer;">
         Entrar com Google
       </button>
@@ -471,15 +468,36 @@ setAuthMode("login");
 
   if (btnLoginGoogle) btnLoginGoogle.addEventListener("click", loginWithGoogle);
 
-  async function logout() {
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    console.error(error);
-    alert("Falha ao sair.");
-    return;
-  }
-  showLogin("Você saiu da conta.");
-}
+  window.logout = async function logout() {
+    try {
+      console.log("logout: clique");
+
+      // pega o client real SEM depender de variável do arquivo
+      const client = window.__supabase || window.supabaseClient;
+
+      console.log("logout client =", client);
+      console.log("logout client.auth =", client?.auth);
+
+      if (!client?.auth?.signOut) {
+        throw new Error("Supabase client/auth não disponível para signOut()");
+      }
+
+      const { error } = await client.auth.signOut();
+      if (error) throw error;
+
+      // Mostra a tela de login de novo
+      if (typeof window.showLogin === "function") window.showLogin("Você saiu da conta.");
+      if (typeof window.showApp === "function") window.showApp(); // opcional remover
+      if (document.getElementById("appRoot")) document.getElementById("appRoot").style.display = "none";
+      if (document.getElementById("authScreen")) document.getElementById("authScreen").style.display = "block";
+
+      console.log("logout: OK");
+    } catch (e) {
+      console.error("logout erro:", e);
+      alert("Falha ao sair. Veja o console.");
+    }
+  };
+
 
   // ✅ deixa global (pra evitar o erro de “não definido” mesmo se outro script chamar)
   window.bootAuthGate = async function bootAuthGate() {
