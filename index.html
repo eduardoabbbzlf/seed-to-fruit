@@ -204,84 +204,72 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-    const SUPABASE_URL = "https://zbttjwqanlphsnyecobh.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpidHRqd3FhbmxwaHNueWVjb2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNjI1NzMsImV4cCI6MjA4NDkzODU3M30.r9ZC1GmID0e7Zrwlck0iXMi5Qa9tsZLaA75S1NF9mvo"
+  // ✅ se algo falhar, pelo menos mostra login em vez de branco
+  const authScreen = document.getElementById("authScreen");
+  const appRoot = document.getElementById("appRoot");
+  const authMsg = document.getElementById("authMsg");
+  const btnLoginGoogle = document.getElementById("btnLoginGoogle");
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
+  function showLogin(message = "") {
+    if (appRoot) appRoot.style.display = "none";
+    if (authScreen) authScreen.style.display = "block";
+    if (authMsg) authMsg.textContent = message;
   }
-});
+  function showApp() {
+    if (authScreen) authScreen.style.display = "none";
+    if (appRoot) appRoot.style.display = "block";
+  }
 
-// ===== AUTH GATE =====
-const authScreen = document.getElementById("authScreen");
-const appRoot = document.getElementById("appRoot");
-const authMsg = document.getElementById("authMsg");
-const btnLoginGoogle = document.getElementById("btnLoginGoogle");
+  const SUPABASE_URL = "https://zbttjwqanlphsnyecobh.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpidHRqd3FhbmxwaHNueWVjb2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNjI1NzMsImV4cCI6MjA4NDkzODU3M30.r9ZC1GmID0e7Zrwlck0iXMi5Qa9tsZLaA75S1NF9mvo"
 
-function showLogin(message = "") {
-  appRoot.style.display = "none";
-  authScreen.style.display = "block";
-  authMsg.textContent = message;
-}
+  // ✅ não redeclara: reutiliza se já existir
+  window.__supabase = window.__supabase || window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
+  );
 
-function showApp() {
-  authScreen.style.display = "none";
-  appRoot.style.display = "block";
-}
+  const supabase = window.__supabase;
 
-async function loginWithGoogle() {
-  const redirectTo = window.location.origin;
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo }
-  });
-  if (error) showLogin("Falha ao abrir login Google.");
-}
+  async function loginWithGoogle() {
+    const redirectTo = window.location.origin;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo }
+    });
+    if (error) showLogin("Falha ao abrir login Google.");
+  }
 
-btnLoginGoogle.addEventListener("click", loginWithGoogle);
+  if (btnLoginGoogle) btnLoginGoogle.addEventListener("click", loginWithGoogle);
 
-async function bootAuthGate() {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      showLogin("Erro no Auth (getSession). Veja o console.");
-      console.error(error);
-      return;
+  // ✅ deixa global (pra evitar o erro de “não definido” mesmo se outro script chamar)
+  window.bootAuthGate = async function bootAuthGate() {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) return showLogin("Erro no Auth (getSession). Veja o console.");
+      if (!session) return showLogin();
+
+      showApp();
+
+      // ✅ Só chama render se ele existir (evita quebrar)
+      if (typeof window.render === "function") window.render();
+    } catch (e) {
+      console.error(e);
+      showLogin("Erro inesperado no Auth Gate. Veja o console.");
     }
-    if (!session) {
-      showLogin();
-      return;
-    }
+  };
 
-    // Logado:
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session) return showLogin();
     showApp();
-    const cloudState = await loadStateCloud();
-    if (cloudState) state = cloudState;
+    if (typeof window.render === "function") window.render();
+  });
 
-    render();
-  } catch (e) {
-    console.error(e);
-    showLogin("Erro inesperado no Auth Gate. Veja o console.");
-  }
-}
-
-supabase.auth.onAuthStateChange(async (_event, session) => {
-  if (!session) {
-    showLogin();
-    return;
-  }
-  showApp();
-  const cloudState = await loadStateCloud();
-  if (cloudState) state = cloudState;
-  render();
-});
-
-bootAuthGate();
-showLogin("Teste: se aparecer isso, seu HTML está OK e o problema era JS.");
+  // ✅ inicia
+  window.bootAuthGate();
 </script>
+
 
   <script>
     // =========================
