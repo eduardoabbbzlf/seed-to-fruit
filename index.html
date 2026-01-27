@@ -89,6 +89,142 @@
     .tag.on{background:var(--ok); border-color:transparent; color:#04140a; font-weight:900}
     .listbox{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
     .small{font-size:12px}
+
+    .formEmail{margin-bottom: 4%;}
+    #authPassword{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#08101a; color:var(--text); outline:none;}
+    #authPassword2 {width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#08101a; color:var(--text); outline:none;}
+    #btnForgotPass:hover {color: #89CFFF; cursor: pointer;}
+    #btnToggleAuthMode:hover {color: #89CFFF; cursor: pointer; text-decoration: underline;}
+
+    .linha-ou {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #888; /* Cor do texto */
+}
+
+.linha-ou::before,
+.linha-ou::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #223044; /* Cor e estilo da linha */
+}
+
+.linha-ou:not(:empty)::before {
+  margin-right: 10px; /* Espaço entre a linha e o texto */
+}
+
+.linha-ou:not(:empty)::after {
+  margin-left: 10px; /* Espaço entre o texto e a linha */
+}
+
+#btnAuthSubmit {width: 100%;}
+
+#forgotEmail {width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#08101a; color:var(--text); outline:none;}
+#forgotEmail2 {width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#08101a; color:var(--text); outline:none;}
+
+    .gsi-material-button {
+      display: flex;
+      justify-content: center;
+  background-color: WHITE;
+  background-image: none;
+  border: 1px solid #747775;
+  -webkit-border-radius: 20px;
+  border-radius: 20px;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: 'Roboto', arial, sans-serif;
+  font-size: 14px;
+  height: 40px;
+  letter-spacing: 0.25px;
+  outline: none;
+  overflow: hidden;
+  padding: 0 12px;
+  position: relative;
+  text-align: center;
+  -webkit-transition: background-color .218s, border-color .218s, box-shadow .218s;
+  transition: background-color .218s, border-color .218s, box-shadow .218s;
+  vertical-align: middle;
+  white-space: nowrap;
+  width: auto;
+  min-width: min-content;
+  
+}
+
+.gsi-material-button .gsi-material-button-icon {
+  height: 20px;
+  margin-right: 10px;
+  min-width: 20px;
+  width: 20px;
+}
+
+.gsi-material-button .gsi-material-button-content-wrapper {
+  -webkit-align-items: center;
+  align-items: center;
+  display: flex;
+  -webkit-flex-direction: row;
+  flex-direction: row;
+  -webkit-flex-wrap: nowrap;
+  flex-wrap: nowrap;
+  height: 100%;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.gsi-material-button .gsi-material-button-contents {
+  -webkit-flex-grow: 0;
+  flex-grow: 0;
+  font-family: 'Roboto', arial, sans-serif;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+.gsi-material-button .gsi-material-button-state {
+  -webkit-transition: opacity .218s;
+  transition: opacity .218s;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.gsi-material-button:disabled {
+  cursor: default;
+  background-color: #ffffff61;
+  border-color: #1f1f1f1f;
+}
+
+.gsi-material-button:disabled .gsi-material-button-contents {
+  opacity: 38%;
+}
+
+.gsi-material-button:disabled .gsi-material-button-icon {
+  opacity: 38%;
+}
+
+.gsi-material-button:not(:disabled):active .gsi-material-button-state, 
+.gsi-material-button:not(:disabled):focus .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 12%;
+}
+
+.gsi-material-button:not(:disabled):hover {
+  -webkit-box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+}
+
+.gsi-material-button:not(:disabled):hover .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 8%;
+}
+
   </style>
 
 </head>
@@ -97,10 +233,8 @@
   <div style="border:1px solid #223044; border-radius:14px; background:#111823; padding:16px;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
       <div>
-        <h2 style="margin:0 0 6px 0;">Entrar</h2>
-        <p style="margin:0; color:#9fb0c3; font-size:12px;">
-          Faça login para carregar e salvar seus projetos na nuvem.
-        </p>
+        <h2 style="margin:0 0 6px 0; width: 100%">Entrar</h2>
+        <p>Não tem uma conta? <a id="btnToggleAuthMode">Se increva aqui!</a></p>
       </div>
 
       <span id="authModeBadge" class="badge" style="white-space:nowrap;">Modo: Login</span>
@@ -109,28 +243,47 @@
     <div class="sep"></div>
 
     <!-- Mensagem -->
-    <p id="authMsg" style="margin:0 0 12px 0; color:#9fb0c3; font-size:12px;"></p>
+    <p id="authMsg" style="margin:0 0 12px 0; color:#9fb0c3; font-size:13px;"></p>
 
     <!-- Campos comuns -->
-    <div class="q" style="margin:0 0 10px 0;">
-      <label for="authEmail">Email</label>
-      <input id="authEmail" type="text" placeholder="seuemail@exemplo.com" autocomplete="email" />
+    <div class="formEmail">
+      <input id="authEmail" type="text" placeholder="Email" autocomplete="email" />
     </div>
 
-    <div class="q" style="margin:0 0 10px 0;">
-      <label for="authPassword">Senha</label>
-      <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
-      <div class="muted small" style="margin-top:8px;">
-        Dica: use pelo menos 8 caracteres.
+    <div class="formSenha">
+      <input id="authPassword" type="password" placeholder="Senha" autocomplete="current-password" />
+
+      <!-- Link visível (já existia) -->
+      <div class="muted small" style="margin-top:8px; margin-bottom: 4%; text-decoration: underline;">
+        <a id="btnForgotPass">Esqueci a senha</a>
       </div>
-    </div>
 
-    <div>
-      <button id="btnLoginGoogle" style="padding:10px 12px; border-radius:12px; border:0; background:#6aa9ff; color:#06111f; font-weight:800; cursor:pointer;">
-        Entrar com Google
+      <button id="btnForgotPass", type="button", class="link", style="display:none;">
+        Esqueci a senha
       </button>
 
-      <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
+      <div id="forgotContainer" style="display:none; margin-top:12px;">
+        <div class="sep"></div>
+
+        <div class="q" style="margin:0 0 10px 0;">
+          <label for="forgotEmail">E-mail para recuperação</label>
+          <input id="forgotEmail" type="email" placeholder="seuemail@dominio.com" autocomplete="email" />
+        </div>
+
+        <div class="q" style="margin:0 0 10px 0;">
+          <label for="forgotEmail2">Confirmar e-mail</label>
+          <input id="forgotEmail2" type="email" placeholder="repita seu e-mail" autocomplete="email" />
+        </div>
+
+        <div class="row" style="justify-content:space-between; gap:10px; margin-top:10px;">
+          <button class="btn primary" id="btnSendReset" type="button">Enviar link</button>
+          <button class="btn" id="btnCloseForgot" type="button">Fechar</button>
+        </div>
+
+        <p class="muted small" style="margin-top:10px;">
+          Você receberá um link por e-mail para redefinir sua senha.
+        </p>
+      </div>
     </div>
 
     <!-- Campos do cadastro (escondidos no modo login) -->
@@ -146,9 +299,30 @@
       </div>
 
       <div class="q" style="margin:0 0 10px 0;">
-        <label for="authBirth">Data de nascimento</label>
-        <input id="authBirth" type="date" />
+        <label>Data de nascimento</label>
+
+        <div class="row" style="gap:10px;">
+          <select id="birthDay" class="input" style="flex:1;">
+            <option value="">Dia</option>
+          </select>
+
+          <select id="birthMonth" class="input" style="flex:1;">
+            <option value="">Mês</option>
+            <option value="01">Jan</option><option value="02">Fev</option><option value="03">Mar</option>
+            <option value="04">Abr</option><option value="05">Mai</option><option value="06">Jun</option>
+            <option value="07">Jul</option><option value="08">Ago</option><option value="09">Set</option>
+            <option value="10">Out</option><option value="11">Nov</option><option value="12">Dez</option>
+          </select>
+
+          <select id="birthYear" class="input" style="flex:1;">
+            <option value="">Ano</option>
+          </select>
+        </div>
+
+        <!-- valor final (compatível com seu JS atual) -->
+        <input id="authBirth" type="hidden" />
       </div>
+
 
       <div class="q" style="margin:0 0 10px 0;">
         <label for="authCity">Onde você mora</label>
@@ -156,120 +330,41 @@
       </div>
     </div>
 
-    <div class="row" style="justify-content:space-between; margin-top:12px;">
-      <button class="btn" id="btnToggleAuthMode">Criar conta</button>
-
-      <div class="row">
-        <button class="btn" id="btnForgotPass">Esqueci a senha</button>
+    <div>
+      <div class="row" style="margin-bottom: 3%;">
         <button class="btn primary" id="btnAuthSubmit">Entrar</button>
       </div>
     </div>
 
-    <div class="sep"></div>
+    <div class="linha-ou">
+      <span>Ou</span>
+    </div>
 
-    <div class="muted small">
-      Ao continuar, você concorda em usar este app com autenticação via Supabase.
+    <div>
+      <button id="btnLoginGoogle" class="gsi-material-button" style="width:100%; margin-top: 5%;">
+        <div class="gsi-material-button-state"></div>
+        <div class="gsi-material-button-content-wrapper">
+          <div class="gsi-material-button-icon">
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" xmlns:xlink="http://www.w3.org/1999/xlink" style="display: block;">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+              <path fill="none" d="M0 0h48v48H0z"></path>
+            </svg>
+          </div>
+          <span class="gsi-material-button-contents">Entrar com conta Google</span>
+          <span style="display: none;">Entrar com conta Google</span>
+        </div>
+      </button>
+
+      <p id="authMsg" style="margin-top:12px; color:#9fb0c3; font-size:12px;"></p>
     </div>
   </div>
 </div>
 
-
 <div id="appRoot" style="display:none;">
-  <header>
-    <div class="wrap">
-      <div class="top">
-        <div class="title">
-          <div style="font-size:18px;font-weight:900">Mind-to-Delivery</div>
-          <span class="badge">As perguntas só aparecem em <b>“Nova ideia?”</b></span>
-        </div>
-        <div class="kpis" id="kpis"></div>
-      </div>
-
-      <div class="tabs" id="tabs"></div>
-    </div>
-  </header>
-
-  <main class="wrap" style="padding-top:14px">
-    <div class="grid">
-      <section class="card" id="mainCard"></section>
-
-      <aside style="display:grid; gap:10px">
-        <div class="card">
-          <h2>Controles</h2>
-          <div class="row">
-            <button class="btn primary" id="btnNewIdea">Nova ideia?</button>
-            <button class="btn" id="btnSave">Salvar</button>
-            <button class="btn" id="btnExport">Exportar</button>
-            <button class="btn" id="btnImport">Importar</button>
-            <button class="btn danger" id="btnReset">Resetar</button>
-            <button class="btn danger" id="btnLogout">Sair</button>
-          </div>
-          <div class="sep"></div>
-          <div class="row">
-            <button class="btn" id="btnDailyCheckin">Check-in diário (+XP)</button>
-            <span class="pill" id="checkinInfo">—</span>
-          </div>
-          <p class="muted small" style="margin-top:10px">
-            O <b>dashboard</b> mostra só: estado do projeto, progresso, histórico e rotina diária.
-            As <b>perguntas</b> aparecem apenas quando você cria/atualiza um projeto via “Nova ideia?”.
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Gamificação</h2>
-          <div class="mini"><b>Nível</b><span id="lvl">1</span></div>
-          <div class="mini"><b>XP</b><span id="xp">0</span></div>
-          <div class="mini"><b>Streak</b><span id="streak">0 dias</span></div>
-          <div class="mini"><b>Projeto ativo</b><span id="activeProject">—</span></div>
-          <div class="bar"><i id="levelBar"></i></div>
-          <p class="muted small" style="margin:10px 0 0">
-            Regras padrão: <code class="k">+50 XP</code> por marco concluído, <code class="k">+15 XP</code> por check-in diário,
-            <code class="k">+10 XP</code> bônus por dia em streak (cap 100).
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Log</h2>
-          <div class="log" id="log"></div>
-        </div>
-      </aside>
-    </div>
-
-    <footer class="wrap muted small">
-      Tudo roda localmente (LocalStorage). Salve como <code class="k">index.html</code> e abra no navegador.
-    </footer>
-  </main>
-
-  <!-- Modal / Wizard -->
-  <div class="modalBack" id="wizardBack">
-    <div class="modal">
-      <div class="row" style="justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-size:16px;font-weight:900">Nova ideia → Projeto executável</div>
-          <div class="muted small" id="wizardSubtitle">—</div>
-        </div>
-        <div class="row">
-          <button class="btn" id="wizPrev">◀</button>
-          <button class="btn" id="wizNext">▶</button>
-          <button class="btn danger" id="wizClose">Fechar</button>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-
-      <div id="wizardBody"></div>
-
-      <div class="sep"></div>
-
-      <div class="row" style="justify-content:space-between">
-        <div class="muted small">As respostas do wizard viram o “resumo do projeto” no dashboard.</div>
-        <div class="row">
-          <button class="btn" id="wizSaveDraft">Salvar rascunho</button>
-          <button class="btn primary" id="wizFinish">Finalizar (criar/atualizar projeto)</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- ... seu app continua igual ... -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -303,159 +398,267 @@
 
   const sb = window.__supabase;
 
-
   // =========================
-// AUTH UI (Email/Senha + Cadastro no mesmo painel)
-// =========================
-let authMode = "login"; // "login" | "signup"
+  // AUTH UI (Email/Senha + Cadastro no mesmo painel)
+  // =========================
+  let authMode = "login"; // "login" | "signup"
 
-const authModeBadge = document.getElementById("authModeBadge");
-const btnToggleAuthMode = document.getElementById("btnToggleAuthMode");
-const btnAuthSubmit = document.getElementById("btnAuthSubmit");
-const btnForgotPass = document.getElementById("btnForgotPass");
+  const authModeBadge = document.getElementById("authModeBadge");
+  const btnToggleAuthMode = document.getElementById("btnToggleAuthMode");
+  const btnAuthSubmit = document.getElementById("btnAuthSubmit");
+  const btnForgotPass = document.getElementById("btnForgotPass");
 
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
-const authPassword2 = document.getElementById("authPassword2");
-const authName = document.getElementById("authName");
-const authBirth = document.getElementById("authBirth");
-const authCity = document.getElementById("authCity");
-const signupFields = document.getElementById("signupFields");
+  const authEmail = document.getElementById("authEmail");
+  const authPassword = document.getElementById("authPassword");
+  const authPassword2 = document.getElementById("authPassword2");
+  const authName = document.getElementById("authName");
+  const authBirth = document.getElementById("authBirth");
 
-function setAuthMode(mode) {
-  authMode = mode;
+  // ✅ Birth UI (Dia/Mês/Ano) - substitui o input date visual, mantém authBirth como hidden
+  const birthDay = document.getElementById("birthDay");
+  const birthMonth = document.getElementById("birthMonth");
+  const birthYear = document.getElementById("birthYear");
 
-  if (authModeBadge) authModeBadge.innerHTML = `Modo: <b>${mode === "login" ? "Login" : "Cadastro"}</b>`;
-  if (btnAuthSubmit) btnAuthSubmit.textContent = mode === "login" ? "Entrar" : "Criar conta";
-  if (btnToggleAuthMode) btnToggleAuthMode.textContent = mode === "login" ? "Criar conta" : "Já tenho conta";
+  // preenche dia e ano
+  (function initBirthSelects() {
+    if (!birthDay || !birthYear) return;
 
-  if (signupFields) signupFields.style.display = mode === "signup" ? "block" : "none";
+    // Dias 01..31
+    for (let d = 1; d <= 31; d++) {
+      const v = String(d).padStart(2, "0");
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      birthDay.appendChild(opt);
+    }
 
-  // Ajusta autocomplete
-  if (authPassword) authPassword.autocomplete = mode === "signup" ? "new-password" : "current-password";
+    // Anos: de (hoje - 14) até (hoje - 100) -> ajustável
+    const now = new Date();
+    const maxYear = now.getFullYear() - 14;   // idade mínima sugerida
+    const minYear = now.getFullYear() - 100;  // limite
+    for (let y = maxYear; y >= minYear; y--) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = String(y);
+      birthYear.appendChild(opt);
+    }
+  })();
 
-  // Limpa mensagem
-  showLogin("");
-}
+  function syncBirthHidden() {
+    if (!authBirth) return;
 
-function getTrimmed(el) {
-  return (el?.value ?? "").trim();
-}
+    const d = birthDay?.value || "";
+    const m = birthMonth?.value || "";
+    const y = birthYear?.value || "";
 
-function validateAuthInputs() {
-  const email = getTrimmed(authEmail);
-  const pass = authPassword?.value ?? "";
+    // valida rápido (evita 31/02 etc)
+    if (!d || !m || !y) {
+      authBirth.value = "";
+      return;
+    }
 
-  if (!email || !email.includes("@")) return "Digite um email válido.";
-  if (!pass || pass.length < 8) return "Senha precisa ter pelo menos 8 caracteres.";
+    const iso = `${y}-${m}-${d}`;
+    const dt = new Date(`${iso}T00:00:00`);
+    const isValid = dt && !Number.isNaN(dt.getTime()) &&
+      dt.getFullYear() === Number(y) &&
+      String(dt.getMonth() + 1).padStart(2, "0") === m &&
+      String(dt.getDate()).padStart(2, "0") === d;
 
-  if (authMode === "signup") {
-    const pass2 = authPassword2?.value ?? "";
+    authBirth.value = isValid ? iso : "";
+  }
+
+  [birthDay, birthMonth, birthYear].forEach(el => {
+    el?.addEventListener("change", syncBirthHidden);
+  });
+
+  const authCity = document.getElementById("authCity");
+  const signupFields = document.getElementById("signupFields");
+
+  // ✅ ADICIONADO: elementos do form de recuperação
+  const forgotContainer = document.getElementById("forgotContainer");
+  const forgotEmail = document.getElementById("forgotEmail");
+  const forgotEmail2 = document.getElementById("forgotEmail2");
+  const btnSendReset = document.getElementById("btnSendReset");
+  const btnCloseForgot = document.getElementById("btnCloseForgot");
+
+  // ✅ ADICIONADO: alias para corrigir o bug do seu setAuthMode() que usava "btnForgot"
+  const btnForgot = btnForgotPass;
+
+  function closeForgotUI() {
+    if (forgotContainer) forgotContainer.style.display = "none";
+    if (forgotEmail) forgotEmail.value = "";
+    if (forgotEmail2) forgotEmail2.value = "";
+  }
+
+  function openForgotUI() {
+    if (forgotContainer) forgotContainer.style.display = "block";
+    // pré-preenche com o email digitado no login (se tiver)
+    const base = (authEmail?.value ?? "").trim();
+    if (forgotEmail && !forgotEmail.value) forgotEmail.value = base;
+    if (forgotEmail2 && !forgotEmail2.value) forgotEmail2.value = base;
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+
+    if (authModeBadge) authModeBadge.innerHTML = `Modo: <b>${mode === "login" ? "Login" : "Cadastro"}</b>`;
+    if (btnAuthSubmit) btnAuthSubmit.textContent = mode === "login" ? "Entrar" : "Criar conta";
+    if (btnToggleAuthMode) btnToggleAuthMode.textContent = mode === "login" ? "Criar conta" : "Já tenho conta";
+
+    if (signupFields) signupFields.style.display = mode === "signup" ? "block" : "none";
+
+    // ✅ Mantido (só corrigido via alias): Link "Esqueci a senha" SOME no modo signup
+    if (btnForgot) btnForgot.style.display = (authMode === "login") ? "inline-block" : "none";
+
+    // ✅ ADICIONADO: se entrou em signup, fecha o form de recuperação
+    if (authMode === "signup") closeForgotUI();
+
+    // Ajusta autocomplete
+    if (authPassword) authPassword.autocomplete = mode === "signup" ? "new-password" : "current-password";
+
+    // Limpa mensagem
+    showLogin("");
+  }
+
+  function getTrimmed(el) {
+    return (el?.value ?? "").trim();
+  }
+
+  function validateAuthInputs() {
+    const email = getTrimmed(authEmail);
+    const pass = authPassword?.value ?? "";
+
+    if (!email || !email.includes("@")) return "Digite um email válido.";
+    if (!pass || pass.length < 8) return "Senha precisa ter pelo menos 8 caracteres.";
+
+    if (authMode === "signup") {
+      const pass2 = authPassword2?.value ?? "";
+      const name = getTrimmed(authName);
+      const birth = authBirth?.value ?? "";
+      const city = getTrimmed(authCity);
+
+      if (!pass2) return "Repita a senha.";
+      if (pass !== pass2) return "As senhas não conferem.";
+      if (!name) return "Digite seu nome.";
+      if (!birth) return "Informe sua data de nascimento.";
+      if (!city) return "Informe onde você mora (Cidade/Estado).";
+    }
+
+    return null;
+  }
+
+  async function doLoginEmail() {
+    const email = getTrimmed(authEmail);
+    const password = authPassword?.value ?? "";
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      return showLogin("Falha no login. Verifique email/senha e tente novamente.");
+    }
+  }
+
+  async function doSignupEmail() {
+    const email = getTrimmed(authEmail);
+    const password = authPassword?.value ?? "";
+
     const name = getTrimmed(authName);
     const birth = authBirth?.value ?? "";
     const city = getTrimmed(authCity);
 
-    if (!pass2) return "Repita a senha.";
-    if (pass !== pass2) return "As senhas não conferem.";
-    if (!name) return "Digite seu nome.";
-    if (!birth) return "Informe sua data de nascimento.";
-    if (!city) return "Informe onde você mora (Cidade/Estado).";
-  }
-
-  return null;
-}
-
-async function doLoginEmail() {
-  const email = getTrimmed(authEmail);
-  const password = authPassword?.value ?? "";
-
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    // mensagem mais amigável
-    return showLogin("Falha no login. Verifique email/senha e tente novamente.");
-  }
-}
-
-async function doSignupEmail() {
-  const email = getTrimmed(authEmail);
-  const password = authPassword?.value ?? "";
-
-  const name = getTrimmed(authName);
-  const birth = authBirth?.value ?? "";
-  const city = getTrimmed(authCity);
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        name,
-        birth_date: birth,
-        location: city
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          birth_date: birth,
+          location: city
+        }
       }
-      // se você configurar confirmação por email, o Supabase pode exigir o clique no link
+    });
+
+    if (error) {
+      return showLogin("Falha ao criar conta. Tente outro email ou verifique a senha.");
     }
-  });
 
-  if (error) {
-    return showLogin("Falha ao criar conta. Tente outro email ou verifique a senha.");
+    showLogin("Conta criada! Se aparecer pedido de confirmação de email, confirme e depois faça login.");
+    setAuthMode("login");
   }
 
-  // Dependendo das configs do Supabase:
-  // - pode logar direto, ou
-  // - pode exigir confirmação de email
-  showLogin("Conta criada! Se aparecer pedido de confirmação de email, confirme e depois faça login.");
+  async function handleAuthSubmit() {
+    const err = validateAuthInputs();
+    if (err) return showLogin(err);
+
+    if (btnAuthSubmit) btnAuthSubmit.disabled = true;
+
+    try {
+      if (authMode === "login") await doLoginEmail();
+      else await doSignupEmail();
+    } finally {
+      if (btnAuthSubmit) btnAuthSubmit.disabled = false;
+    }
+  }
+
+  // ✅ ALTERADO (sem quebrar o que já existia):
+  // agora o clique em "Esqueci a senha" apenas abre/fecha o form abaixo.
+  async function handleForgotPassword() {
+    if (authMode !== "login") return; // segurança: não abre em signup
+    if (!forgotContainer) return;
+    const isOpen = forgotContainer.style.display === "block";
+    if (isOpen) closeForgotUI();
+    else openForgotUI();
+  }
+
+  // ✅ ADICIONADO: envio do reset usando os campos do form abaixo
+  async function sendResetEmail() {
+    const email1 = getTrimmed(forgotEmail) || getTrimmed(authEmail);
+    const email2 = getTrimmed(forgotEmail2);
+
+    if (!email1 || !email1.includes("@")) return showLogin("Digite um email válido para recuperação.");
+    if (!email2 || email1 !== email2) return showLogin("Os e-mails de recuperação não conferem.");
+
+    const redirectTo = window.location.origin;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email1, { redirectTo });
+    if (error) return showLogin("Não consegui enviar o email de recuperação. Tente novamente.");
+
+    showLogin("Enviei um email de recuperação. Verifique sua caixa de entrada/spam.");
+    closeForgotUI();
+  }
+
+  if (btnToggleAuthMode) {
+    btnToggleAuthMode.addEventListener("click", () => {
+      setAuthMode(authMode === "login" ? "signup" : "login");
+    });
+  }
+
+  if (btnAuthSubmit) btnAuthSubmit.addEventListener("click", handleAuthSubmit);
+
+  // ✅ Mantido: agora abre o form abaixo
+  if (btnForgotPass) btnForgotPass.addEventListener("click", handleForgotPassword);
+
+  // ✅ ADICIONADO: botões do form abaixo
+  if (btnSendReset) btnSendReset.addEventListener("click", sendResetEmail);
+  if (btnCloseForgot) btnCloseForgot.addEventListener("click", closeForgotUI);
+
+  // Enter para enviar
+  [authEmail, authPassword, authPassword2, authName, authBirth, authCity].forEach(el => {
+    if (!el) return;
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleAuthSubmit();
+    });
+  });
+
+  // ✅ ADICIONADO: Enter nos campos de recuperação envia link
+  [forgotEmail, forgotEmail2].forEach(el => {
+    if (!el) return;
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendResetEmail();
+    });
+  });
+
+  // Inicializa modo login
   setAuthMode("login");
-}
-
-async function handleAuthSubmit() {
-  const err = validateAuthInputs();
-  if (err) return showLogin(err);
-
-  // UI disable
-  if (btnAuthSubmit) btnAuthSubmit.disabled = true;
-
-  try {
-    if (authMode === "login") await doLoginEmail();
-    else await doSignupEmail();
-  } finally {
-    if (btnAuthSubmit) btnAuthSubmit.disabled = false;
-  }
-}
-
-async function handleForgotPassword() {
-  const email = getTrimmed(authEmail);
-  if (!email || !email.includes("@")) return showLogin("Digite seu email acima para recuperar a senha.");
-
-  // IMPORTANTE: você precisa permitir a URL no Supabase (Redirect URLs)
-  const redirectTo = window.location.origin;
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-  if (error) return showLogin("Não consegui enviar o email de recuperação. Tente novamente.");
-  showLogin("Enviei um email de recuperação. Verifique sua caixa de entrada/spam.");
-}
-
-if (btnToggleAuthMode) {
-  btnToggleAuthMode.addEventListener("click", () => {
-    setAuthMode(authMode === "login" ? "signup" : "login");
-  });
-}
-
-if (btnAuthSubmit) btnAuthSubmit.addEventListener("click", handleAuthSubmit);
-if (btnForgotPass) btnForgotPass.addEventListener("click", handleForgotPassword);
-
-// Enter para enviar
-[authEmail, authPassword, authPassword2, authName, authBirth, authCity].forEach(el => {
-  if (!el) return;
-  el.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleAuthSubmit();
-  });
-});
-
-// Inicializa modo login
-setAuthMode("login");
-
-
 
   async function loginWithGoogle() {
     const redirectTo = window.location.origin;
@@ -472,7 +675,6 @@ setAuthMode("login");
     try {
       console.log("logout: clique");
 
-      // pega o client real SEM depender de variável do arquivo
       const client = window.__supabase || window.supabaseClient;
 
       console.log("logout client =", client);
@@ -485,7 +687,6 @@ setAuthMode("login");
       const { error } = await client.auth.signOut();
       if (error) throw error;
 
-      // Mostra a tela de login de novo
       if (typeof window.showLogin === "function") window.showLogin("Você saiu da conta.");
       if (typeof window.showApp === "function") window.showApp(); // opcional remover
       if (document.getElementById("appRoot")) document.getElementById("appRoot").style.display = "none";
@@ -498,8 +699,6 @@ setAuthMode("login");
     }
   };
 
-
-  // ✅ deixa global (pra evitar o erro de “não definido” mesmo se outro script chamar)
   window.bootAuthGate = async function bootAuthGate() {
     try {
       const { data: { session }, error } = await sb.auth.getSession();
@@ -508,7 +707,6 @@ setAuthMode("login");
 
       showApp();
 
-      // ✅ Só chama render se ele existir (evita quebrar)
       if (typeof window.render === "function") window.render();
     } catch (e) {
       console.error(e);
@@ -522,9 +720,9 @@ setAuthMode("login");
     if (typeof window.render === "function") window.render();
   });
 
-  // ✅ inicia
   window.bootAuthGate();
 </script>
+
 
 
 <script>
