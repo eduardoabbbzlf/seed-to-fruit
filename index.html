@@ -258,7 +258,7 @@
         <a id="btnForgotPass">Esqueci a senha</a>
       </div>
 
-      <button id="btnForgotPass", type="button", class="link", style="display:none;">
+      <button id="btnForgotPass" type="button" class="link" style="display:none;">
         Esqueci a senha
       </button>
 
@@ -963,6 +963,8 @@
     // =========================
     // 4) Wizard "Nova ideia?"
     // =========================
+    
+
     const wizardBack = document.getElementById("wizardBack");
     const wizardBody = document.getElementById("wizardBody");
     const wizardSubtitle = document.getElementById("wizardSubtitle");
@@ -1114,6 +1116,8 @@
           }, 50);
       }
 
+      const elTabs = document.getElementById("tabs");
+
       // Agora substitua a função wireWizardInputs() inteira por esta:
       function wireWizardInputs(){
           wizardBody.querySelectorAll("textarea[data-path], input[data-path], select[data-path]").forEach(el=>{
@@ -1226,23 +1230,28 @@
       render();
     }
 
-    wizPrev.onclick = ()=>{ wizardStep = Math.max(0, wizardStep-1); renderWizard(); };
-    wizNext.onclick = ()=>{
+    if (wizPrev) wizPrev.onclick = ()=>{ wizardStep = Math.max(0, wizardStep-1); renderWizard(); };
+
+    if (wizNext) wizNext.onclick = ()=>{
       const stages = visibleWizardStages();
       wizardStep = Math.min(stages.length-1, wizardStep+1);
       renderWizard();
     };
-    wizClose.onclick = ()=> closeWizard();
-    wizSaveDraft.onclick = ()=>{
+
+    if (wizClose) wizClose.onclick = ()=> closeWizard();
+
+    if (wizSaveDraft) wizSaveDraft.onclick = ()=>{
       addLog("Rascunho do wizard salvo (fica só na memória até finalizar) ✍️");
       render();
     };
-    wizFinish.onclick = ()=> wizardFinish();
+
+    if (wizFinish) wizFinish.onclick = ()=> wizardFinish();
+
+
 
     // =========================
     // 5) Dashboard / Projeto / Rotina / Histórico
     // =========================
-    const elTabs=document.getElementById("tabs");
     const elMain=document.getElementById("mainCard");
     const elKpis=document.getElementById("kpis");
     const elLvl=document.getElementById("lvl");
@@ -1254,15 +1263,17 @@
     const elActiveProject=document.getElementById("activeProject");
 
     function renderTabs(){
-      elTabs.innerHTML="";
-      TABS.forEach(t=>{
-        const b=document.createElement("button");
-        b.className="tab"+(activeTab===t.id?" active":"");
-        b.textContent=t.label;
-        b.onclick=()=>{ activeTab=t.id; render(); };
-        elTabs.appendChild(b);
-      });
-    }
+    if (!elTabs) return;
+    elTabs.innerHTML="";
+    TABS.forEach(t=>{
+      const b=document.createElement("button");
+      b.className="tab"+(activeTab===t.id?" active":"");
+      b.textContent=t.label;
+      b.onclick=()=>{ activeTab=t.id; render(); };
+      elTabs.appendChild(b);
+    });
+  }
+
 
     function renderKpis(){
       const p=getActiveProject();
@@ -1286,6 +1297,8 @@
         <div class="kpi"><b>${escapeHtml(risk)}</b><span>Status (heurístico)</span><div class="bar"><i style="width:${w}%"></i></div></div>
       `;
     }
+
+    
 
     function renderGamification(){
       const info=getLevelFromXP(state.xp);
@@ -1534,14 +1547,17 @@
     // =========================
     // 7) Export / Import / Reset
     // =========================
-    document.getElementById("btnNewIdea").onclick = ()=> openWizard("create");
-    document.getElementById("btnSave").onclick = ()=> saveState();
-    document.getElementById("btnDailyCheckin").onclick = ()=> dailyCheckin();
-    const btnLogout = document.getElementById("btnLogout");
-      if (btnLogout) btnLogout.addEventListener("click", logout);
+    const btnNewIdea = document.getElementById("btnNewIdea");
+    if (btnNewIdea) btnNewIdea.onclick = ()=> openWizard("create");
 
+    const btnSave = document.getElementById("btnSave");
+    if (btnSave) btnSave.onclick = ()=> saveState();
 
-    document.getElementById("btnReset").onclick = ()=>{
+    const btnDailyCheckin = document.getElementById("btnDailyCheckin");
+    if (btnDailyCheckin) btnDailyCheckin.onclick = ()=> dailyCheckin();
+
+    const btnReset = document.getElementById("btnReset");
+    if (btnReset) btnReset.onclick = ()=>{
       if(!confirm("Tem certeza? Isso apaga tudo salvo localmente.")) return;
       state = defaultState();
       localStorage.removeItem(LS_KEY);
@@ -1550,7 +1566,8 @@
       render();
     };
 
-    document.getElementById("btnExport").onclick = ()=>{
+    const btnExport = document.getElementById("btnExport");
+    if (btnExport) btnExport.onclick = ()=>{
       const payload = {
         exported_at: new Date().toISOString(),
         version: "v2",
@@ -1566,7 +1583,8 @@
       render();
     };
 
-    document.getElementById("btnImport").onclick = async ()=>{
+    const btnImport = document.getElementById("btnImport");
+    if (btnImport) btnImport.onclick = async ()=>{
       const input=document.createElement("input");
       input.type="file";
       input.accept="application/json";
@@ -1589,6 +1607,10 @@
       };
       input.click();
     };
+
+    const btnLogout = document.getElementById("btnLogout");
+    if (btnLogout) btnLogout.addEventListener("click", logout);
+
 
     // =========================
     // 8) Utils
