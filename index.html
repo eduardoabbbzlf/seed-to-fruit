@@ -229,6 +229,7 @@
 
 </head>
 <body>
+<div id="appRoot" style="display:none;">
 <div id="authScreen" style="display:none; max-width:520px; margin:40px auto; padding:16px;">
   <div style="border:1px solid #223044; border-radius:14px; background:#111823; padding:16px;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
@@ -363,8 +364,6 @@
   </div>
 </div>
 
-<div id="appRoot" style="display:none;">
-  <!-- ... seu app continua igual ... -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -707,7 +706,11 @@
 
       showApp();
 
-      if (typeof window.render === "function") window.render();
+      if (typeof window.render === "function") {
+        // ✅ só renderiza se os containers do app existem
+        const hasUI = document.getElementById("mainCard") && document.getElementById("kpis") && document.getElementById("tabs");
+        if (hasUI) window.render();
+      }
     } catch (e) {
       console.error(e);
       showLogin("Erro inesperado no Auth Gate. Veja o console.");
@@ -717,7 +720,11 @@
   sb.auth.onAuthStateChange((_event, session) => {
     if (!session) return showLogin();
     showApp();
-    if (typeof window.render === "function") window.render();
+    if (typeof window.render === "function") {
+      // ✅ só renderiza se os containers do app existem
+      const hasUI = document.getElementById("mainCard") && document.getElementById("kpis") && document.getElementById("tabs");
+      if (hasUI) window.render();
+    }
   });
 
   window.bootAuthGate();
@@ -1276,6 +1283,7 @@
 
 
     function renderKpis(){
+      if (!elKpis) return;
       const p=getActiveProject();
       if(!p){
         elKpis.innerHTML = `
@@ -1301,6 +1309,7 @@
     
 
     function renderGamification(){
+      if (!elLvl || !elXP || !elStreak || !elLevelBar) return;
       const info=getLevelFromXP(state.xp);
       elLvl.textContent=info.lvl;
       elXP.textContent=state.xp.toLocaleString("pt-BR");
@@ -1315,12 +1324,14 @@
     }
 
     function renderLog(){
+      if (!elLog) return;
       elLog.innerHTML = state.log.length
         ? state.log.map(x=>`<div><span class="muted small">${escapeHtml(x.ts)}</span><br>${escapeHtml(x.msg)}</div>`).join("")
         : `<div class="muted">Sem eventos ainda.</div>`;
     }
 
     function renderDashboard(){
+      if (!elMain) return;
       const p=getActiveProject();
       if(!p){
         elMain.innerHTML = `
@@ -1391,6 +1402,7 @@
     }
 
     function renderProjeto(){
+      if (!elMain) return;
       const p=getActiveProject();
       if(!p){
         elMain.innerHTML = `
@@ -1447,6 +1459,7 @@
     }
 
     function renderRotina(){
+      if (!elMain) return;
       const p=getActiveProject();
       if(!p){
         elMain.innerHTML = `
@@ -1482,6 +1495,7 @@
     }
 
     function renderHistorico(){
+      if (!elMain) return;
       const p=getActiveProject();
       if(!p){
         elMain.innerHTML = `
