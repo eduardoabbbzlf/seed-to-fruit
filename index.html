@@ -551,6 +551,16 @@
     return null;
   }
 
+  function getClient() {
+    const client = window.__supabase;
+    if (!client || !client.auth) {
+      console.error("Supabase client inválido:", client);
+      throw new Error("Supabase client não inicializado. Verifique createClient().");
+    }
+    return client;
+  }
+
+
   async function doLoginEmail() {
   const email = getTrimmed(authEmail);
   const password = authPassword?.value ?? "";
