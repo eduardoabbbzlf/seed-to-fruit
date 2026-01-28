@@ -351,6 +351,45 @@
       <div class="muted small" id="dashUserLine">Carregando usuário…</div>
     </section>
 
+    <!-- Modal: Nova ideia -->
+    <div id="ideaModalBack" class="modalBack">
+      <div class="modal">
+        <div class="row" style="justify-content:space-between;">
+          <h2 style="margin:0;">Nova ideia (Semente)</h2>
+          <button id="btnCloseIdeaModal" class="btn">Fechar</button>
+        </div>
+        <div class="sep"></div>
+
+        <div class="q">
+          <label>Título curto da ideia</label>
+          <input id="ideaTitle" type="text" placeholder="Ex: App para organizar estudos com rotina" />
+          <div class="muted small">Dica: curto e direto (5–9 palavras).</div>
+        </div>
+
+        <div class="q">
+          <label>Explique a ideia do jeito mais simples</label>
+          <textarea id="ideaRaw" placeholder="Escreva como se estivesse contando pra um amigo."></textarea>
+        </div>
+
+        <div class="q">
+          <label>Quem é o usuário?</label>
+          <input id="ideaUser" type="text" placeholder="Ex: estudantes que se perdem na rotina" />
+        </div>
+
+        <div class="q">
+          <label>Qual dor principal?</label>
+          <input id="ideaPain" type="text" placeholder="Ex: não conseguem manter consistência e se frustram" />
+        </div>
+
+        <div class="row" style="justify-content:flex-end; gap:10px;">
+          <button id="btnCreateIdea" class="btn primary">Criar projeto</button>
+        </div>
+
+        <p id="ideaModalMsg" class="muted small" style="margin-top:10px;"></p>
+      </div>
+    </div>
+
+
     <!-- =========================
      SeedToFruit: Empty State + Modal "Primeira Ideia"
     ========================= -->
