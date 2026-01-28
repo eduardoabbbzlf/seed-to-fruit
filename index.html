@@ -202,6 +202,7 @@
     <!-- Campos comuns -->
     <div class="formEmail">
       <input id="authEmail" type="text" placeholder="Email" autocomplete="email" />
+        <div id="authEmailErr" class="small" style="display:none; margin-top:8px; color: var(--bad);"></div>
     </div>
 
     <div class="formSenha">
@@ -528,6 +529,25 @@
     return (el?.value ?? "").trim().toLowerCase();
   }
 
+  const authEmailErr = document.getElementById("authEmailErr");
+
+  function setEmailError(msg) {
+    if (!authEmailErr) return;
+    authEmailErr.textContent = msg;
+    authEmailErr.style.display = "block";
+  }
+
+  function clearEmailError() {
+    if (!authEmailErr) return;
+    authEmailErr.textContent = "";
+    authEmailErr.style.display = "none";
+  }
+
+  // limpa erro ao digitar no email
+  if (authEmail) {
+    authEmail.addEventListener("input", () => clearEmailError());
+  }
+
 
   function validateAuthInputs() {
     const email = getTrimmed(authEmail);
@@ -599,6 +619,8 @@
 
 
   async function doSignupEmail() {
+    clearEmailError();
+
     const email = getTrimmed(authEmail);
     const password = authPassword?.value ?? "";
 
@@ -606,25 +628,50 @@
     const birth = authBirth?.value ?? "";
     const city = getTrimmed(authCity);
 
-    const { error } = await sb.auth.signUp({
+    const client = getClient();
+
+    const { data, error } = await client.auth.signUp({
       email,
       password,
       options: {
-        data: {
-          name,
-          birth_date: birth,
-          location: city
-        }
+        data: { name, birth_date: birth, location: city }
       }
     });
 
     if (error) {
-      return showLogin("Falha ao criar conta. Tente outro email ou verifique a senha.");
+      console.error("Signup error:", error);
+
+      const msg = (error.message || "").toLowerCase();
+
+      // email já existe (comum)
+      if (msg.includes("already") || msg.includes("exists") || msg.includes("registered")) {
+        setEmailError("Este email já está cadastrado. Se você já entrou com Google, use “Entrar com conta Google”.");
+        return showLogin("");
+      }
+
+      showLogin("Não foi possível criar a conta. Verifique os dados e tente novamente.");
+      return;
     }
 
-    showLogin("Conta criada! Se aparecer pedido de confirmação de email, confirme e depois faça login.");
+    // ✅ DETECÇÃO: se o Supabase indicar que esse usuário é de Google, bloqueia e orienta
+    const provider =
+      data?.user?.app_metadata?.provider ||
+      data?.user?.identities?.[0]?.provider ||
+      "";
+
+    if (String(provider).toLowerCase() === "google") {
+      // “desfaz” a ideia de que criou uma conta por senha — e orienta o usuário corretamente
+      setEmailError("Este email já está vinculado ao Google. Para acessar, clique em “Entrar com conta Google”.");
+      showLogin("");
+      setAuthMode("login");
+      return;
+    }
+
+    // fluxo normal
+    showLogin("Conta criada ✅ Agora faça login com seu email e senha.");
     setAuthMode("login");
   }
+
 
   async function handleAuthSubmit() {
     const err = validateAuthInputs();
