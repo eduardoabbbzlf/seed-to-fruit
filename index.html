@@ -504,14 +504,25 @@
   const SUPABASE_URL = "https://zbttjwqanlphsnyecobh.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpidHRqd3FhbmxwaHNueWVjb2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNjI1NzMsImV4cCI6MjA4NDkzODU3M30.r9ZC1GmID0e7Zrwlck0iXMi5Qa9tsZLaA75S1NF9mvo";
 
-  // ✅ não redeclara: reutiliza se já existir
-  window.__supabase = window.__supabase || window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
-  );
-
+  // =========================
+  // Supabase singleton (1x)
+  // =========================
+  if (!window.__supabase) {
+    window.__supabase = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storageKey: "seedtofruit-auth" // evita conflito com outros apps/testes
+        }
+      }
+    );
+  }
   const sb = window.__supabase;
+
 
   // =========================
   // AUTH UI (Email/Senha + Cadastro no mesmo painel)
@@ -853,13 +864,14 @@
   setAuthMode("login");
 
   async function loginWithGoogle() {
-    const redirectTo = window.location.origin;
+    const redirectTo = `${window.location.origin}/`;
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo }
     });
     if (error) showLogin("Falha ao abrir login Google.");
   }
+
 
   if (btnLoginGoogle) btnLoginGoogle.addEventListener("click", loginWithGoogle);
 
@@ -967,32 +979,64 @@ window.logout = async function logout() {
 
   if (btnLogoutTop) btnLogoutTop.onclick = () => window.logout();
 
+  function isAuthCallbackUrl() {
+    const h = window.location.hash || "";
+    const q = window.location.search || "";
+    return (
+      h.includes("access_token=") ||
+      h.includes("refresh_token=") ||
+      h.includes("type=recovery") ||
+      q.includes("code=") // alguns fluxos usam ?code=
+    );
+  }
+
   window.bootAuthGate = async function bootAuthGate() {
     try {
+      // Se estamos voltando do OAuth, não force getSession imediatamente.
+      // Deixe o onAuthStateChange “assumir” e renderizar.
+      if (isAuthCallbackUrl()) {
+        console.log("[AuthGate] Callback detectado. Aguardando onAuthStateChange...");
+        showLogin("Finalizando login…");
+        return;
+      }
+
       const { data: { session }, error } = await sb.auth.getSession();
-      if (error) return showLogin("Erro no Auth (getSession). Veja o console.");
+      if (error) {
+        console.error("[AuthGate] getSession error:", error);
+        return showLogin("Erro no Auth (getSession). Veja o console.");
+      }
       if (!session) return showLogin();
 
       showApp();
       showDashboardView();
       await hydrateUserUI(session);
-      await renderSeedToFruitState(session);
-
-
-      // ✅ não chama mais render antigo (dashboard antigo foi removido)
+      if (typeof renderSeedToFruitState === "function") await renderSeedToFruitState(session);
     } catch (e) {
-      console.error(e);
+      console.error("[AuthGate] erro inesperado:", e);
       showLogin("Erro inesperado no Auth Gate. Veja o console.");
     }
   };
 
-  sb.auth.onAuthStateChange(async (_event, session) => {
-    if (!session) return showLogin();
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    console.log("[Auth] event:", event, "session:", !!session);
+
+    // Quando o login OAuth finaliza, pode sobrar hash na URL.
+    // Limpa para não reprocessar.
+    if (event === "SIGNED_IN" && (window.location.hash || "").includes("access_token")) {
+      history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    if (!session) {
+      return showLogin();
+    }
+
     showApp();
     showDashboardView();
     await hydrateUserUI(session);
-    await renderSeedToFruitState(session);
+    if (typeof renderSeedToFruitState === "function") await renderSeedToFruitState(session);
   });
+
 
   window.bootAuthGate();
 
