@@ -555,7 +555,7 @@
     const email = getTrimmed(authEmail);
     const password = authPassword?.value ?? "";
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
       return showLogin("Falha no login. Verifique email/senha e tente novamente.");
     }
@@ -569,7 +569,7 @@
     const birth = authBirth?.value ?? "";
     const city = getTrimmed(authCity);
 
-    const { error } = await supabase.auth.signUp({
+    const { error } = await sb.auth.signUp({
       email,
       password,
       options: {
@@ -620,7 +620,7 @@
 
     const redirectTo = window.location.origin;
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email1, { redirectTo });
+    const { error } = await sb.auth.resetPasswordForEmail(email1, { redirectTo });
     if (error) return showLogin("Não consegui enviar o email de recuperação. Tente novamente.");
 
     showLogin("Enviei um email de recuperação. Verifique sua caixa de entrada/spam.");
@@ -628,10 +628,19 @@
   }
 
   if (btnToggleAuthMode) {
-    btnToggleAuthMode.addEventListener("click", () => {
+    btnToggleAuthMode.addEventListener("click", (e) => {
+      e.preventDefault();
       setAuthMode(authMode === "login" ? "signup" : "login");
     });
   }
+
+  if (btnForgotPass) {
+    btnForgotPass.addEventListener("click", (e) => {
+      e.preventDefault();
+      handleForgotPassword();
+    });
+  }
+
 
   if (btnAuthSubmit) btnAuthSubmit.addEventListener("click", handleAuthSubmit);
   if (btnForgotPass) btnForgotPass.addEventListener("click", handleForgotPassword);
