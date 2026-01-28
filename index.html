@@ -525,8 +525,9 @@
   }
 
   function getTrimmed(el) {
-    return (el?.value ?? "").trim();
+    return (el?.value ?? "").trim().toLowerCase();
   }
+
 
   function validateAuthInputs() {
     const email = getTrimmed(authEmail);
@@ -567,6 +568,18 @@
 
   const client = getClient();
   const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    console.error("Login error:", error);
+
+    const msg = (error.message || "").toLowerCase();
+
+    if (msg.includes("invalid login credentials")) {
+      return showLogin("Este email já está vinculado a uma conta Google. Para entrar, clique em “Entrar com conta Google”.");
+    }
+
+    return showLogin("Não foi possível entrar. Verifique seu email e senha e tente novamente.");
+  }
 
   if (error) {
     console.error("Login error:", error);
