@@ -905,223 +905,6 @@
     if (viewDashboard) viewDashboard.style.display = "block";
   }
 
-  // =========================
-  // SeedToFruit: Projeto ativo + criar primeira ideia
-  // =========================
-  const seedEmptyState = document.getElementById("seedEmptyState");
-  const btnAddFirstIdea = document.getElementById("btnAddFirstIdea");
-
-  const ideaModalBack = document.getElementById("ideaModalBack");
-  const btnCloseIdeaModal = document.getElementById("btnCloseIdeaModal");
-  const btnCreateIdea = document.getElementById("btnCreateIdea");
-  const ideaModalMsg = document.getElementById("ideaModalMsg");
-
-  const ideaTitle = document.getElementById("ideaTitle");
-  const ideaRaw = document.getElementById("ideaRaw");
-  const ideaUser = document.getElementById("ideaUser");
-  const ideaPain = document.getElementById("ideaPain");
-
-  function openIdeaModal() {
-    if (ideaModalMsg) ideaModalMsg.textContent = "";
-    if (ideaModalBack) ideaModalBack.style.display = "flex";
-  }
-  function closeIdeaModal() {
-    if (ideaModalBack) ideaModalBack.style.display = "none";
-  }
-
-  if (btnAddFirstIdea) btnAddFirstIdea.addEventListener("click", openIdeaModal);
-  if (btnCloseIdeaModal) btnCloseIdeaModal.addEventListener("click", closeIdeaModal);
-  if (ideaModalBack) {
-    ideaModalBack.addEventListener("click", (e) => {
-      if (e.target === ideaModalBack) closeIdeaModal();
-    });
-  }
-
-  function todayISODate() {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  async function getActiveProject(userId) {
-    const { data, error } = await sb
-      .from("projects")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (error) throw error;
-    return data?.[0] || null;
-  }
-
-  async function renderSeedToFruitState(session) {
-    const userId = session?.user?.id;
-    if (!userId) return;
-
-    let active = null;
-    try {
-      active = await getActiveProject(userId);
-    } catch (e) {
-      console.error("Erro buscando projeto ativo:", e);
-    }
-
-    // Se não tem projeto, mostra o empty-state (blur + botão)
-    if (!active) {
-      if (seedEmptyState) seedEmptyState.style.display = "block";
-      return;
-    }
-
-    // Se tem projeto, por enquanto só esconde o empty-state
-    if (seedEmptyState) seedEmptyState.style.display = "none";
-
-    // Aqui (Dia 2) a gente renderiza as 6 sessões do dashboard com dados reais.
-    if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
-  }
-
-  async function createSeedProject(session) {
-    const userId = session?.user?.id;
-    if (!userId) return;
-
-    const title = (ideaTitle?.value || "").trim();
-    const raw = (ideaRaw?.value || "").trim();
-    const usr = (ideaUser?.value || "").trim();
-    const pain = (ideaPain?.value || "").trim();
-
-    if (!title || title.length < 3) throw new Error("Dê um título curto para sua ideia.");
-    if (!raw || raw.length < 10) throw new Error("Explique a ideia com um pouco mais de detalhes.");
-    if (!usr) throw new Error("Informe quem vai usar.");
-    if (!pain) throw new Error("Informe a dor principal.");
-
-    // 1) Criar projeto
-    const { data: proj, error: e1 } = await sb
-      .from("projects")
-      .insert({
-        user_id: userId,
-        title,
-        idea_raw: raw,
-        status: "active",
-        current_phase: 1
-      })
-      .select("*")
-      .single();
-
-    if (e1) throw e1;
-
-    // 2) Criar fase 1 (Prompt Mestre) - template (IA vem depois)
-    const phase1Questions = [
-      "Quem vai usar isso?",
-      "O que essa pessoa tenta fazer hoje e não consegue bem?",
-      "O que ela reclama com frequência?",
-      "O que ela perde por causa disso? (tempo, dinheiro, esforço, estresse)",
-      "Se esse problema desaparecesse, o que mudaria na vida dela?"
-    ];
-
-    const { data: phase, error: e2 } = await sb
-      .from("project_phases")
-      .insert({
-        project_id: proj.id,
-        phase_number: 1,
-        phase_title: "Clareza da Dor",
-        status: "active",
-        content_json: {
-          who: usr,
-          pain,
-          questions: phase1Questions,
-          answers: {}
-        }
-      })
-      .select("*")
-      .single();
-
-    if (e2) throw e2;
-
-    // 3) Criar plano do dia (hoje)
-    const day = todayISODate();
-    const routine = {
-      sleep_hours: 7,
-      lunch_minutes: 60,
-      wake_time: "06:30",
-      sleep_time: "23:30",
-      notes: "Rotina inicial (será recalibrada pela IA depois)."
-    };
-
-    const { data: daily, error: e3 } = await sb
-      .from("daily_plans")
-      .insert({
-        project_id: proj.id,
-        day_date: day,
-        focus_title: "Definir a dor com clareza",
-        routine_json: routine,
-        progress_percent: 0
-      })
-      .select("*")
-      .single();
-
-    if (e3) throw e3;
-
-    // 4) Criar tarefas iniciais (template)
-    const tasks = [
-      {
-        daily_plan_id: daily.id,
-        title: "Escrever a Frase da Dor",
-        description: "Pessoas que _____ sofrem com _____ porque _____.",
-        priority: 1,
-        type: "focus",
-        xp_reward: 20
-      },
-      {
-        daily_plan_id: daily.id,
-        title: "Responder as perguntas da Fase 1",
-        description: "Preencha as respostas do Prompt Mestre (fase 1).",
-        priority: 1,
-        type: "task",
-        xp_reward: 30
-      },
-      {
-        daily_plan_id: daily.id,
-        title: "Listar 3 pessoas reais para falar",
-        description: "Quem você pode entrevistar ainda essa semana?",
-        priority: 2,
-        type: "validation",
-        xp_reward: 20
-      }
-    ];
-
-    const { error: e4 } = await sb.from("tasks").insert(tasks);
-    if (e4) throw e4;
-
-    return proj;
-  }
-
-  if (btnCreateIdea) {
-    btnCreateIdea.addEventListener("click", async () => {
-      try {
-        if (btnCreateIdea) btnCreateIdea.disabled = true;
-        if (ideaModalMsg) ideaModalMsg.textContent = "Criando projeto…";
-
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) throw new Error("Sessão não encontrada. Faça login novamente.");
-
-        await createSeedProject(session);
-
-        if (ideaModalMsg) ideaModalMsg.textContent = "Projeto criado ✅";
-        closeIdeaModal();
-
-        await renderSeedToFruitState(session);
-      } catch (e) {
-        console.error(e);
-        if (ideaModalMsg) ideaModalMsg.textContent = e.message || "Falha ao criar projeto.";
-      } finally {
-        if (btnCreateIdea) btnCreateIdea.disabled = false;
-      }
-    });
-  }
-
-
   function showProfileView() {
     if (viewDashboard) viewDashboard.style.display = "none";
     if (viewProfile) viewProfile.style.display = "block";
@@ -1187,6 +970,184 @@
   });
 
   window.bootAuthGate();
+
+  // =========================
+  // SeedToFruit: UI + Render
+  // =========================
+  const seedEmptyState = document.getElementById("seedEmptyState");
+  const btnAddFirstIdea = document.getElementById("btnAddFirstIdea");
+
+  const ideaModalBack = document.getElementById("ideaModalBack");
+  const btnCloseIdeaModal = document.getElementById("btnCloseIdeaModal");
+  const btnCreateIdea = document.getElementById("btnCreateIdea");
+  const ideaModalMsg = document.getElementById("ideaModalMsg");
+
+  const ideaTitle = document.getElementById("ideaTitle");
+  const ideaRaw = document.getElementById("ideaRaw");
+  const ideaUser = document.getElementById("ideaUser");
+  const ideaPain = document.getElementById("ideaPain");
+
+  function openIdeaModal() {
+    if (ideaModalMsg) ideaModalMsg.textContent = "";
+    if (ideaModalBack) ideaModalBack.style.display = "flex";
+  }
+  function closeIdeaModal() {
+    if (ideaModalBack) ideaModalBack.style.display = "none";
+  }
+
+  btnAddFirstIdea?.addEventListener("click", openIdeaModal);
+  btnCloseIdeaModal?.addEventListener("click", closeIdeaModal);
+  ideaModalBack?.addEventListener("click", (e) => {
+    if (e.target === ideaModalBack) closeIdeaModal();
+  });
+
+  function todayISODate() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  async function getActiveProject(userId) {
+    const { data, error } = await sb
+      .from("projects")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+    return data?.[0] || null;
+  }
+
+  async function renderSeedToFruitState(session) {
+    console.log("[SeedToFruit] renderSeedToFruitState()");
+    const userId = session?.user?.id;
+    console.log("[SeedToFruit] userId =", userId);
+
+    if (!userId) return;
+
+    let active = null;
+    try {
+      active = await getActiveProject(userId);
+    } catch (e) {
+      console.error("[SeedToFruit] erro ao buscar projeto:", e);
+    }
+
+    console.log("[SeedToFruit] activeProject =", active);
+
+    if (!active) {
+      if (seedEmptyState) seedEmptyState.style.display = "block";
+      return;
+    }
+
+    if (seedEmptyState) seedEmptyState.style.display = "none";
+    if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
+  }
+
+  async function createSeedProject(session) {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const title = (ideaTitle?.value || "").trim();
+    const raw = (ideaRaw?.value || "").trim();
+    const usr = (ideaUser?.value || "").trim();
+    const pain = (ideaPain?.value || "").trim();
+
+    if (!title || title.length < 3) throw new Error("Dê um título curto para sua ideia.");
+    if (!raw || raw.length < 10) throw new Error("Explique a ideia com um pouco mais de detalhes.");
+    if (!usr) throw new Error("Informe quem vai usar.");
+    if (!pain) throw new Error("Informe a dor principal.");
+
+    const { data: proj, error: e1 } = await sb
+      .from("projects")
+      .insert({
+        user_id: userId,
+        title,
+        idea_raw: raw,
+        status: "active",
+        current_phase: 1
+      })
+      .select("*")
+      .single();
+    if (e1) throw e1;
+
+    const phase1Questions = [
+      "Quem vai usar isso?",
+      "O que essa pessoa tenta fazer hoje e não consegue bem?",
+      "O que ela reclama com frequência?",
+      "O que ela perde por causa disso? (tempo, dinheiro, esforço, estresse)",
+      "Se esse problema desaparecesse, o que mudaria na vida dela?"
+    ];
+
+    const { error: e2 } = await sb
+      .from("project_phases")
+      .insert({
+        project_id: proj.id,
+        phase_number: 1,
+        phase_title: "Clareza da Dor",
+        status: "active",
+        content_json: { who: usr, pain, questions: phase1Questions, answers: {} }
+      });
+    if (e2) throw e2;
+
+    const day = todayISODate();
+    const routine = {
+      sleep_hours: 7,
+      lunch_minutes: 60,
+      wake_time: "06:30",
+      sleep_time: "23:30",
+      notes: "Rotina inicial (será recalibrada pela IA depois)."
+    };
+
+    const { data: daily, error: e3 } = await sb
+      .from("daily_plans")
+      .insert({
+        project_id: proj.id,
+        day_date: day,
+        focus_title: "Definir a dor com clareza",
+        routine_json: routine,
+        progress_percent: 0
+      })
+      .select("*")
+      .single();
+    if (e3) throw e3;
+
+    const tasks = [
+      { daily_plan_id: daily.id, title: "Escrever a Frase da Dor", description: "Pessoas que _____ sofrem com _____ porque _____.", priority: 1, type: "focus", xp_reward: 20 },
+      { daily_plan_id: daily.id, title: "Responder as perguntas da Fase 1", description: "Preencha as respostas do Prompt Mestre (fase 1).", priority: 1, type: "task", xp_reward: 30 },
+      { daily_plan_id: daily.id, title: "Listar 3 pessoas reais para falar", description: "Quem você pode entrevistar ainda essa semana?", priority: 2, type: "validation", xp_reward: 20 }
+    ];
+
+    const { error: e4 } = await sb.from("tasks").insert(tasks);
+    if (e4) throw e4;
+
+    return proj;
+  }
+
+  btnCreateIdea?.addEventListener("click", async () => {
+    try {
+      btnCreateIdea.disabled = true;
+      if (ideaModalMsg) ideaModalMsg.textContent = "Criando projeto…";
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) throw new Error("Sessão não encontrada. Faça login novamente.");
+
+      await createSeedProject(session);
+
+      if (ideaModalMsg) ideaModalMsg.textContent = "Projeto criado ✅";
+      closeIdeaModal();
+
+      await renderSeedToFruitState(session);
+    } catch (e) {
+      console.error(e);
+      if (ideaModalMsg) ideaModalMsg.textContent = e.message || "Falha ao criar projeto.";
+    } finally {
+      btnCreateIdea.disabled = false;
+    }
+  });
 </script>
 
 </body>
