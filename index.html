@@ -552,14 +552,28 @@
   }
 
   async function doLoginEmail() {
-    const email = getTrimmed(authEmail);
-    const password = authPassword?.value ?? "";
+  const email = getTrimmed(authEmail);
+  const password = authPassword?.value ?? "";
 
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      return showLogin("Falha no login. Verifique email/senha e tente novamente.");
+  const client = getClient();
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    console.error("Login error:", error);
+
+    // mensagens comuns do Supabase
+    const msg = (error.message || "").toLowerCase();
+
+    if (msg.includes("email not confirmed")) {
+      return showLogin("Seu email ainda não foi confirmado. Abra o email que o Supabase enviou e confirme o cadastro.");
     }
+
+    return showLogin(error.message || "Falha no login. Verifique email/senha e tente novamente.");
   }
+
+  // se logou, segue normal
+}
+
 
   async function doSignupEmail() {
     const email = getTrimmed(authEmail);
