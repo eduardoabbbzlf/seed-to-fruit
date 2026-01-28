@@ -497,6 +497,10 @@
     if (appRoot) appRoot.style.display = "block";
   }
 
+  window.showLogin = showLogin;
+  window.showApp = showApp;
+
+
   const SUPABASE_URL = "https://zbttjwqanlphsnyecobh.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpidHRqd3FhbmxwaHNueWVjb2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzNjI1NzMsImV4cCI6MjA4NDkzODU3M30.r9ZC1GmID0e7Zrwlck0iXMi5Qa9tsZLaA75S1NF9mvo";
 
@@ -859,32 +863,53 @@
 
   if (btnLoginGoogle) btnLoginGoogle.addEventListener("click", loginWithGoogle);
 
-  window.logout = async function logout() {
+  let __loggingOut = false;
+
+window.logout = async function logout() {
+    if (__loggingOut) return;
+    __loggingOut = true;
+
     try {
       console.log("logout: clique");
 
-      const client = window.__supabase || window.supabaseClient;
+      // desabilita botão pra evitar spam
+      const btn = document.getElementById("btnLogoutTop");
+      if (btn) btn.disabled = true;
 
-      console.log("logout client =", client);
-      console.log("logout client.auth =", client?.auth);
+      const client = window.__supabase;
+      if (!client?.auth?.signOut) throw new Error("Supabase client/auth não disponível para signOut()");
 
-      if (!client?.auth?.signOut) {
-        throw new Error("Supabase client/auth não disponível para signOut()");
-      }
-
+      console.log("logout: calling signOut()");
       const { error } = await client.auth.signOut();
       if (error) throw error;
 
+      console.log("logout: signOut OK -> forçando UI pro login");
+
+      // força UI pro login imediatamente (não depende do onAuthStateChange)
       if (typeof window.showLogin === "function") window.showLogin("Você saiu da conta.");
-      if (document.getElementById("appRoot")) document.getElementById("appRoot").style.display = "none";
-      if (document.getElementById("authScreen")) document.getElementById("authScreen").style.display = "block";
+      else {
+        // fallback
+        const appRoot = document.getElementById("appRoot");
+        const authScreen = document.getElementById("authScreen");
+        if (appRoot) appRoot.style.display = "none";
+        if (authScreen) authScreen.style.display = "block";
+      }
+
+      // opcional: limpar qualquer “estado visual” do dashboard
+      const seed = document.getElementById("seedEmptyState");
+      if (seed) seed.style.display = "none";
 
       console.log("logout: OK");
     } catch (e) {
       console.error("logout erro:", e);
       alert("Falha ao sair. Veja o console.");
+    } finally {
+      const btn = document.getElementById("btnLogoutTop");
+      if (btn) btn.disabled = false;
+      __loggingOut = false;
     }
   };
+
 
   // =========================
   // Dashboard Base: só Perfil / Sair
@@ -940,7 +965,7 @@
     showDashboardView();
   });
 
-  if (btnLogoutTop) btnLogoutTop.addEventListener("click", () => window.logout());
+  if (btnLogoutTop) btnLogoutTop.onclick = () => window.logout();
 
   window.bootAuthGate = async function bootAuthGate() {
     try {
