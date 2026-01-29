@@ -1217,45 +1217,57 @@
     console.log("[SeedToFruit] userId =", userId);
     if (!userId) return;
 
-    // pinta rápido com cache (zero travamento)
+    // 1) pinta rápido com cache (zero travamento)
     if (__activeProjectCache?.id) {
       if (seedEmptyState) seedEmptyState.style.display = "none";
-      if (dashUserLine) dashUserLine.textContent =
-        `Logado como: ${session.user.email} • Projeto: ${__activeProjectCache.title}`;
+      if (dashUserLine) {
+        dashUserLine.textContent =
+          `Logado como: ${session.user.email} • Projeto: ${__activeProjectCache.title}`;
+      }
     }
 
+    // 2) se opts mandou não buscar, para aqui (mas UI já foi pintada)
+    if (!allowFetch) {
+      console.log("[SeedToFruit] render (sem fetch) por opts");
+      return;
+    }
 
+    // 3) se estamos na janela ruim (token refresh), não busca agora
+    if (isProjectFetchPaused()) {
+      console.log("[SeedToFruit] fetch pausado, mantendo cache");
+      return;
+    }
+
+    // 4) busca no banco
     let active = null;
     try {
       active = await getActiveProject(userId);
     } catch (e) {
       console.error("[SeedToFruit] erro ao buscar projeto (não transitório):", e);
-      // aqui sim você pode decidir mostrar login ou uma mensagem
       return;
     }
-    
+
     console.log("[SeedToFruit] activeProject =", active);
 
+    // 5) se não tem projeto ativo, mostra empty
     if (!active) {
-      // se não tem mesmo (e não é erro), mostra empty
       if (seedEmptyState) seedEmptyState.style.display = "block";
       if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email}`;
       return;
     }
 
+    // 6) atualiza cache (agora confirmado pelo banco)
+    __activeProjectCache = active;
+    saveCachedProject(active);
+    __lastProjectRefreshAt = Date.now();
+
+    // 7) atualiza UI final
     if (seedEmptyState) seedEmptyState.style.display = "none";
-    if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
+    if (dashUserLine) {
+      dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
+    }
   }
 
-  if (!allowFetch) {
-    console.log("[SeedToFruit] render (sem fetch) por opts");
-    return;
-  }
-
-  if (isProjectFetchPaused()) {
-    console.log("[SeedToFruit] fetch pausado, mantendo cache");
-    return;
-  }
 
 
 
