@@ -1271,6 +1271,7 @@
 
 
 
+
   async function createSeedProject(session) {
     const userId = session?.user?.id;
     if (!userId) return;
@@ -1388,12 +1389,6 @@
       btnCreateIdea.disabled = false;
     }
   });
-
-  const active = await getActiveProject(userId);
-    if (active) {
-      __activeProjectCache = active;
-      saveCachedProject(active);
-    }
 
 
   let __rehydrating = false;
