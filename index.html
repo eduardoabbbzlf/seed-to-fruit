@@ -481,6 +481,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+  window.__scriptLoads = (window.__scriptLoads || 0) + 1;
+  console.log("[APP] script loads:", window.__scriptLoads);
+
+
   // ✅ se algo falhar, pelo menos mostra login em vez de branco
   const authScreen = document.getElementById("authScreen");
   const appRoot = document.getElementById("appRoot");
@@ -522,6 +526,23 @@
     );
   }
   const sb = window.__supabase;
+
+  // =========================
+  // Session Store (fonte única)
+  // =========================
+  window.__session = null;
+
+  async function ensureSessionLoaded() {
+    // tenta carregar uma vez sem ficar chamando várias vezes
+    if (window.__session) return window.__session;
+
+    const { data, error } = await sb.auth.getSession();
+    if (error) throw error;
+
+    window.__session = data.session || null;
+    return window.__session;
+  }
+
 
 
   // =========================
@@ -968,7 +989,9 @@ window.logout = async function logout() {
   }
 
   if (btnGoProfile) btnGoProfile.addEventListener("click", async () => {
-    const { data: { session } } = await sb.auth.getSession();
+    const session = window.__session || await ensureSessionLoaded();
+    if (!session) throw new Error("Sessão não encontrada. Faça login novamente.");
+
     await hydrateUserUI(session);
     showProfileView();
   });
@@ -1020,12 +1043,7 @@ window.logout = async function logout() {
 
   sb.auth.onAuthStateChange(async (event, session) => {
     console.log("[Auth] event:", event, "session:", !!session);
-
-    // Quando o login OAuth finaliza, pode sobrar hash na URL.
-    // Limpa para não reprocessar.
-    if (event === "SIGNED_IN" && (window.location.hash || "").includes("access_token")) {
-      history.replaceState({}, document.title, window.location.pathname);
-    }
+    window.__session = session || null;
 
     if (!session) {
       return showLogin();
