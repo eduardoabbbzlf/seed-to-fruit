@@ -1013,12 +1013,11 @@
 
   if (btnGoProfile) btnGoProfile.addEventListener("click", async () => {
     const session = window.__session || await ensureSessionLoaded();
-    if (!session) throw new Error("Sessão não encontrada. Faça login novamente.");
-
-    await createSeedProject(session);
+    if (!session) return showLogin("Sessão não encontrada. Faça login novamente.");
     await hydrateUserUI(session);
     showProfileView();
   });
+
 
   if (btnBackDashboard) btnBackDashboard.addEventListener("click", () => {
     showDashboardView();
@@ -1139,46 +1138,52 @@
     );
   }
 
-
+  let __activeProjectInflight = null;
 
   async function getActiveProject(userId) {
-    async function run(timeoutMs) {
-      const req = sb
-        .from("projects")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(1);
+    if (__activeProjectInflight) return __activeProjectInflight;
 
-      const { data, error } = await withTimeout(req, timeoutMs, "projects.select(active)");
-      if (error) throw error;
+    __activeProjectInflight = (async () => {
+      async function run(timeoutMs) {
+        const req = sb
+          .from("projects")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-      return data?.[0] || null;
-    }
-
-    try {
-      // no retorno de aba, pode demorar: 15s
-      const p = await run(15000);
-      __lastActiveProject = p || __lastActiveProject;
-      return p;
-    } catch (e) {
-      if (isTransientError(e)) {
-        console.warn("[SeedToFruit] erro transitório ao buscar projeto. Retry 1x...");
-        await new Promise(r => setTimeout(r, 500));
-
-        try {
-          const p2 = await run(15000);
-          __lastActiveProject = p2 || __lastActiveProject;
-          return p2;
-        } catch (e2) {
-          console.warn("[SeedToFruit] retry falhou, mantendo último projeto conhecido.");
-          return __lastActiveProject; // <<< NÃO some a UI
-        }
+        const { data, error } = await withTimeout(req, timeoutMs, "projects.select(active)");
+        if (error) throw error;
+        return data?.[0] || null;
       }
-      throw e; // erro real (RLS, permissão etc.)
-    }
+
+      try {
+        const p = await run(15000);
+        __lastActiveProject = p || __lastActiveProject;
+        return p;
+      } catch (e) {
+        if (isTransientError(e)) {
+          console.warn("[SeedToFruit] erro transitório ao buscar projeto. Retry 1x...");
+          await new Promise(r => setTimeout(r, 700));
+          try {
+            const p2 = await run(15000);
+            __lastActiveProject = p2 || __lastActiveProject;
+            return p2;
+          } catch {
+            console.warn("[SeedToFruit] retry falhou, mantendo último projeto conhecido.");
+            return __lastActiveProject;
+          }
+        }
+        throw e;
+      } finally {
+        __activeProjectInflight = null;
+      }
+    })();
+
+    return __activeProjectInflight;
   }
+
 
   let __lastProjectRefreshAt = 0;
 
@@ -1493,8 +1498,22 @@
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") scheduleRehydrate("visibilitychange");
+    if (document.visibilityState !== "visible") return;
+
+    const s = window.__session;
+    if (!s?.user?.id) return;
+
+    // 1) pinta instantâneo com cache (sem tocar no Supabase)
+    renderSeedToFruitState(s, { allowFetch: false });
+
+    // 2) dá tempo pro Supabase terminar _onVisibilityChanged / lock / refresh
+    setTimeout(() => {
+      const s2 = window.__session;
+      if (!s2?.user?.id) return;
+      renderSeedToFruitState(s2, { allowFetch: true });
+    }, 7000); // ✅ 7s é o "definitivo": evita lock/abort
   });
+
 
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) scheduleRehydrate("pageshow-bfcache");
