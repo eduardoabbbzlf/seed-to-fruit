@@ -1336,10 +1336,10 @@
     const { error: e4 } = await sb.from("tasks").insert(tasks);
     if (e4) throw new Error(`tasks.insert: ${e4.message}`);
 
-    return proj;
-
     __activeProjectCache = proj;
     saveCachedProject(proj);
+
+    return proj;
   }
 
   function withTimeout(promise, ms, label) {
