@@ -1163,8 +1163,11 @@
 
     // Para SIGNED_IN / INITIAL_SESSION, renderiza normal
     if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+          applyView();
+    if (__currentView !== "profile") {
       await renderSeedToFruitState(session);
     }
+    } 
   });
 
 
@@ -1303,8 +1306,15 @@
   // carrega ao iniciar
   __activeProjectCache = loadCachedProject();
 
+  function canRenderProjectsHere() {
+    return (__currentView === "dashboard" || __currentView === "projects" || __currentView === "projectDetail");
+  }
+
 
   async function renderSeedToFruitState(session, opts = {}) {
+      if (!canRenderProjectsHere()) {
+        return;
+    } 
     const allowFetch = opts.allowFetch !== false; // default true
     console.log("[SeedToFruit] renderSeedToFruitState()");
     const userId = session?.user?.id;
