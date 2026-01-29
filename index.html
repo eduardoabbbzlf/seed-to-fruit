@@ -936,45 +936,20 @@
     if (__loggingOut) return;
     __loggingOut = true;
 
-    const btnLogoutTop = document.getElementById("btnLogoutTop");
-    const btnGoProfile = document.getElementById("btnGoProfile");
+    console.log("logout: clique (instant)");
+    uiForceToLogin("Você saiu da conta.");
 
+    // tenta signOut, mas não bloqueia a experiência
     try {
-      console.log("logout: clique");
-
-      // desabilita botões durante o processo
-      if (btnLogoutTop) btnLogoutTop.disabled = true;
-      if (btnGoProfile) btnGoProfile.disabled = true;
-
-      const client = window.__supabase;
-      if (!client?.auth?.signOut) throw new Error("Supabase client/auth não disponível para signOut()");
-
-      console.log("logout: calling signOut()");
-
-      // tenta signOut, mas não deixa travar
-      await withTimeout(client.auth.signOut(), 6000, "signOut");
-
+      await withTimeout(sb.auth.signOut(), 15000, "signOut");
       console.log("logout: signOut OK");
-
-      // após signOut, o onAuthStateChange deve disparar,
-      // mas nós já garantimos a UI aqui
-      uiForceToLogin("Você saiu da conta.");
     } catch (e) {
-      console.error("logout erro:", e);
-
-      // fallback: mesmo se signOut travar/falhar, força UI pro login
-      uiForceToLogin("Você saiu da conta.");
-
-      // opcional: informar que foi um logout forçado (sem assustar)
-      // (se quiser, comente a linha acima e use abaixo)
-      // uiForceToLogin("Sessão encerrada (modo seguro).");
+      console.warn("logout: signOut falhou/timeout (ok):", e?.message || e);
     } finally {
-      // reabilita botões
-      if (btnLogoutTop) btnLogoutTop.disabled = false;
-      if (btnGoProfile) btnGoProfile.disabled = false;
       __loggingOut = false;
     }
   };
+
 
 
 
@@ -1039,42 +1014,33 @@
 
   function isAuthCallbackUrl() {
     const h = window.location.hash || "";
-    const q = window.location.search || "";
-    return (
-      h.includes("access_token=") ||
-      h.includes("refresh_token=") ||
-      h.includes("type=recovery") ||
-      q.includes("code=") // alguns fluxos usam ?code=
-    );
+    // Só considera callback se vier token no HASH (OAuth implicit flow)
+    return h.includes("access_token=") || h.includes("refresh_token=");
   }
 
   window.bootAuthGate = async function bootAuthGate() {
     try {
-      // Se estamos voltando do OAuth, não force getSession imediatamente.
-      // Deixe o onAuthStateChange “assumir” e renderizar.
-      if (isAuthCallbackUrl()) {
-        console.log("[AuthGate] Callback detectado. Aguardando onAuthStateChange...");
-        showLogin("Finalizando login…");
-        return;
-      }
+      const { data, error } = await withTimeout(sb.auth.getSession(), 15000, "boot.getSession");
+      if (error) throw error;
 
-      const { data: { session }, error } = await sb.auth.getSession();
-      if (error) {
-        console.error("[AuthGate] getSession error:", error);
-        return showLogin("Erro no Auth (getSession). Veja o console.");
-      }
+      const session = data.session || null;
+      window.__session = session;
+
       if (!session) return showLogin();
 
       showApp();
       showDashboardView();
       await hydrateUserUI(session);
-      if (typeof renderSeedToFruitState === "function") await renderSeedToFruitState(session);
+      await renderSeedToFruitState(session);
     } catch (e) {
-      console.error("[AuthGate] erro inesperado:", e);
-      showLogin("Erro inesperado no Auth Gate. Veja o console.");
+      console.error("[boot] erro:", e);
+      showLogin();
     }
   };
 
+
+
+  let __lastAuthRenderAt = 0;
 
   sb.auth.onAuthStateChange(async (event, session) => {
     console.log("[Auth] event:", event, "session:", !!session);
@@ -1082,14 +1048,27 @@
 
     if (!session) return showLogin();
 
-    // Render só em eventos importantes
-    if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-      showApp();
-      showDashboardView();
-      await hydrateUserUI(session);
-      await renderSeedToFruitState(session);
+    // evita render duplicado em menos de 2s
+    const now = Date.now();
+    const shouldRender =
+      (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") &&
+      (now - __lastAuthRenderAt > 2000);
+
+    if (!shouldRender) return;
+
+    __lastAuthRenderAt = now;
+
+    showApp();
+    showDashboardView();
+    await hydrateUserUI(session);
+    await renderSeedToFruitState(session);
+
+    // se houver token no hash, limpa para não “reprocessar”
+    if ((window.location.hash || "").includes("access_token")) {
+      history.replaceState({}, document.title, window.location.pathname);
     }
   });
+
 
 
 
@@ -1190,6 +1169,27 @@
     }
   }
 
+  let __lastProjectRefreshAt = 0;
+
+  const ACTIVE_PROJECT_CACHE_KEY = "seedtofruit_active_project_cache";
+  let __activeProjectCache = null;
+
+  function loadCachedProject() {
+    try {
+      const raw = localStorage.getItem(ACTIVE_PROJECT_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function saveCachedProject(p) {
+    try {
+      if (!p) return;
+      localStorage.setItem(ACTIVE_PROJECT_CACHE_KEY, JSON.stringify(p));
+    } catch {}
+  }
+
+  // carrega ao iniciar
+  __activeProjectCache = loadCachedProject();
 
 
   async function renderSeedToFruitState(session) {
@@ -1197,6 +1197,14 @@
     const userId = session?.user?.id;
     console.log("[SeedToFruit] userId =", userId);
     if (!userId) return;
+
+    // pinta rápido com cache (zero travamento)
+    if (__activeProjectCache?.id) {
+      if (seedEmptyState) seedEmptyState.style.display = "none";
+      if (dashUserLine) dashUserLine.textContent =
+        `Logado como: ${session.user.email} • Projeto: ${__activeProjectCache.title}`;
+    }
+
 
     let active = null;
     try {
@@ -1206,7 +1214,7 @@
       // aqui sim você pode decidir mostrar login ou uma mensagem
       return;
     }
-
+    
     console.log("[SeedToFruit] activeProject =", active);
 
     if (!active) {
@@ -1376,7 +1384,16 @@
         showApp();
         showDashboardView();
         await hydrateUserUI(memSession);
-        await renderSeedToFruitState(memSession);
+          const needsRefresh =
+              !__activeProjectCache || (Date.now() - __lastProjectRefreshAt > 10000);
+
+            if (needsRefresh) {
+              await renderSeedToFruitState(memSession);
+              __lastProjectRefreshAt = Date.now();
+            } else {
+              console.log("[rehydrate] skip project refresh (cache recente)");
+            }
+
         console.log("[rehydrate] done (memory session)");
         return;
       }
