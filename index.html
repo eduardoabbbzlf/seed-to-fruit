@@ -335,6 +335,7 @@
         </div>
 
         <div class="row">
+          <button id="btnGoProjects" class="btn">Projetos</button>
           <button id="btnGoProfile" class="btn">Perfil</button>
           <button id="btnLogoutTop" class="btn danger">Sair</button>
         </div>
@@ -447,6 +448,55 @@
         <p id="ideaModalMsg" class="muted small" style="margin-top:10px;"></p>
       </div>
     </div>
+
+    <!-- View: Projetos -->
+    <section id="viewProjects" class="card" style="display:none;">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Projetos</h2>
+        <button id="btnBackFromProjects" class="btn">Voltar</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div id="projectsMsg" class="muted small">Carregando…</div>
+      <div id="projectsList" style="margin-top:12px; display:grid; gap:10px;"></div>
+    </section>
+
+    <!-- View: Detalhe do Projeto -->
+    <section id="viewProjectDetail" class="card" style="display:none;">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div>
+          <h2 id="projectTitle" style="margin:0;">Projeto</h2>
+          <div id="projectMetaLine" class="muted small">—</div>
+        </div>
+        <button id="btnBackToProjects" class="btn">Voltar</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <!-- FASE 1 -->
+      <div class="q">
+        <label>FASE 1 — Clareza da Dor</label>
+        <div class="muted small" id="phase1Progress">Progresso: 0%</div>
+      </div>
+
+      <div class="q">
+        <label>Frase da Dor</label>
+        <input id="phase1PainSentence" type="text"
+          placeholder='Pessoas que _____ sofrem com _____ porque _____.' />
+        <div class="muted small">Preencha de forma simples e direta.</div>
+      </div>
+
+      <div id="phase1QuestionsWrap"></div>
+
+      <div class="row" style="justify-content:flex-end; gap:10px; margin-top:10px;">
+        <button id="btnSavePhase1" class="btn">Salvar progresso</button>
+        <button id="btnCompletePhase1" class="btn primary">Concluir Fase 1</button>
+      </div>
+
+      <p id="phase1Msg" class="muted small" style="margin-top:10px;"></p>
+    </section>
+
 
 
     <!-- View: Perfil -->
@@ -971,6 +1021,11 @@
   // Dashboard Base: só Perfil / Sair
   // =========================
   const viewDashboard = document.getElementById("viewDashboard");
+  const viewProjects = document.getElementById("viewProjects");
+  const viewProjectDetail = document.getElementById("viewProjectDetail");
+  const btnGoProjects = document.getElementById("btnGoProjects");
+  const btnBackFromProjects = document.getElementById("btnBackFromProjects");
+  const btnBackToProjects = document.getElementById("btnBackToProjects");
   const viewProfile = document.getElementById("viewProfile");
   const btnGoProfile = document.getElementById("btnGoProfile");
   const btnBackDashboard = document.getElementById("btnBackDashboard");
@@ -984,6 +1039,20 @@
   function showDashboardView() {
     if (viewProfile) viewProfile.style.display = "none";
     if (viewDashboard) viewDashboard.style.display = "block";
+  }
+
+  function showProjectsView() {
+    if (viewDashboard) viewDashboard.style.display = "none";
+    if (viewProfile) viewProfile.style.display = "none";
+    if (viewProjectDetail) viewProjectDetail.style.display = "none";
+    if (viewProjects) viewProjects.style.display = "block";
+  }
+
+  function showProjectDetailView() {
+    if (viewDashboard) viewDashboard.style.display = "none";
+    if (viewProfile) viewProfile.style.display = "none";
+    if (viewProjects) viewProjects.style.display = "none";
+    if (viewProjectDetail) viewProjectDetail.style.display = "block";
   }
 
   function showProfileView() {
@@ -1011,12 +1080,32 @@
     }
   }
 
-  if (btnGoProfile) btnGoProfile.addEventListener("click", async () => {
+  btnGoProjects?.addEventListener("click", async () => {
+    const session = window.__session || await ensureSessionLoaded();
+    if (!session) return showLogin("Sessão não encontrada. Faça login novamente.");
+    showProjectsView();
+    await loadProjectsList(session);
+  });
+
+  btnBackFromProjects?.addEventListener("click", () => {
+    showDashboardView();
+  });
+
+  btnBackToProjects?.addEventListener("click", async () => {
+    const session = window.__session || await ensureSessionLoaded();
+    if (!session) return showLogin("Sessão não encontrada. Faça login novamente.");
+    showProjectsView();
+    await loadProjectsList(session);
+  });
+
+
+  btnGoProfile?.addEventListener("click", async () => {
     const session = window.__session || await ensureSessionLoaded();
     if (!session) return showLogin("Sessão não encontrada. Faça login novamente.");
     await hydrateUserUI(session);
     showProfileView();
   });
+
 
 
   if (btnBackDashboard) btnBackDashboard.addEventListener("click", () => {
@@ -1518,6 +1607,268 @@
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) scheduleRehydrate("pageshow-bfcache");
   });
+
+  const projectsList = document.getElementById("projectsList");
+  const projectsMsg = document.getElementById("projectsMsg");
+
+  async function loadProjectsList(session) {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    if (projectsMsg) projectsMsg.textContent = "Carregando projetos…";
+    if (projectsList) projectsList.innerHTML = "";
+
+    const { data, error } = await sb
+      .from("projects")
+      .select("id,title,status,current_phase,created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      if (projectsMsg) projectsMsg.textContent = "Erro ao carregar projetos.";
+      console.error("loadProjectsList error:", error);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      if (projectsMsg) projectsMsg.textContent = "Você ainda não tem projetos.";
+      return;
+    }
+
+    if (projectsMsg) projectsMsg.textContent = "";
+
+    data.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "q";
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+          <div>
+            <div style="font-weight:900;">${escapeHtml(p.title || "Sem título")}</div>
+            <div class="muted small">Status: ${escapeHtml(p.status)} • Fase: ${p.current_phase || 1}</div>
+            <div class="muted small">Criado: ${new Date(p.created_at).toLocaleString("pt-BR")}</div>
+          </div>
+          <button class="btn" data-open="${p.id}">Abrir</button>
+        </div>
+      `;
+      projectsList.appendChild(card);
+    });
+
+    projectsList.querySelectorAll("button[data-open]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const projectId = btn.getAttribute("data-open");
+        await openProjectDetail(session, projectId);
+      });
+    });
+  }
+
+  async function openProjectDetail(session, projectId) {
+    showProjectDetailView();
+    await renderProjectDetail(session, projectId);
+  }
+
+  // simples para não quebrar HTML
+  function escapeHtml(str = "") {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  const projectTitle = document.getElementById("projectTitle");
+  const projectMetaLine = document.getElementById("projectMetaLine");
+
+  const phase1PainSentence = document.getElementById("phase1PainSentence");
+  const phase1QuestionsWrap = document.getElementById("phase1QuestionsWrap");
+  const phase1Progress = document.getElementById("phase1Progress");
+  const phase1Msg = document.getElementById("phase1Msg");
+
+  const btnSavePhase1 = document.getElementById("btnSavePhase1");
+  const btnCompletePhase1 = document.getElementById("btnCompletePhase1");
+
+  let __currentProjectId = null;
+  let __phase1RowId = null; // id do project_phases (linha)
+  let __phase1Json = null;  // content_json em memória
+
+  async function renderProjectDetail(session, projectId) {
+    __currentProjectId = projectId;
+    __phase1RowId = null;
+    __phase1Json = null;
+
+    if (phase1Msg) phase1Msg.textContent = "Carregando…";
+
+    // 1) Carrega projeto
+    const { data: proj, error: e1 } = await sb
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single();
+
+    if (e1) {
+      console.error("project load error:", e1);
+      if (phase1Msg) phase1Msg.textContent = "Erro ao carregar projeto.";
+      return;
+    }
+
+    if (projectTitle) projectTitle.textContent = proj.title || "Projeto";
+    if (projectMetaLine) projectMetaLine.textContent =
+      `Status: ${proj.status} • Fase atual: ${proj.current_phase || 1}`;
+
+    // 2) Carrega Fase 1
+    const { data: ph, error: e2 } = await sb
+      .from("project_phases")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("phase_number", 1)
+      .limit(1);
+
+    if (e2) {
+      console.error("phase1 load error:", e2);
+      if (phase1Msg) phase1Msg.textContent = "Erro ao carregar Fase 1.";
+      return;
+    }
+
+    const row = (ph && ph[0]) ? ph[0] : null;
+    if (!row) {
+      // Se por algum motivo não existir, cria (robustez)
+      const defaultQ = [
+        "Quem vai usar isso?",
+        "O que essa pessoa tenta fazer hoje e não consegue bem?",
+        "O que ela reclama com frequência?",
+        "O que ela perde por causa disso? (tempo, dinheiro, esforço, estresse)",
+        "Se esse problema desaparecesse, o que mudaria na vida dela?"
+      ];
+
+      const { data: created, error: e3 } = await sb
+        .from("project_phases")
+        .insert({
+          project_id: projectId,
+          phase_number: 1,
+          phase_title: "Clareza da Dor",
+          status: "active",
+          content_json: { pain_sentence: "", questions: defaultQ, answers: ["","","","",""] }
+        })
+        .select("*")
+        .single();
+
+      if (e3) {
+        console.error("phase1 create error:", e3);
+        if (phase1Msg) phase1Msg.textContent = "Erro ao criar Fase 1.";
+        return;
+      }
+
+      __phase1RowId = created.id;
+      __phase1Json = created.content_json;
+    } else {
+      __phase1RowId = row.id;
+      __phase1Json = row.content_json || {};
+    }
+
+    paintPhase1UI();
+    if (phase1Msg) phase1Msg.textContent = "";
+  }
+
+  function paintPhase1UI() {
+    const q = __phase1Json?.questions || [];
+    const a = __phase1Json?.answers || ["","","","",""];
+
+    if (phase1PainSentence) phase1PainSentence.value = __phase1Json?.pain_sentence || "";
+
+    if (phase1QuestionsWrap) {
+      phase1QuestionsWrap.innerHTML = "";
+      q.forEach((question, idx) => {
+        const box = document.createElement("div");
+        box.className = "q";
+        box.innerHTML = `
+          <label>${escapeHtml(question)}</label>
+          <textarea data-q="${idx}" placeholder="Responda de forma direta…"></textarea>
+        `;
+        phase1QuestionsWrap.appendChild(box);
+        const ta = box.querySelector("textarea");
+        ta.value = a[idx] || "";
+        ta.addEventListener("input", () => {
+          __phase1Json.answers[idx] = ta.value;
+          updatePhase1Progress();
+        });
+      });
+    }
+
+    updatePhase1Progress();
+  }
+
+  function calcPhase1Percent() {
+    const answers = __phase1Json?.answers || [];
+    const filled = answers.filter(x => String(x || "").trim().length > 0).length;
+    const total = 5;
+    return Math.round((filled / total) * 100);
+  }
+
+  function updatePhase1Progress() {
+    if (!__phase1Json) return;
+    const pct = calcPhase1Percent();
+    if (phase1Progress) phase1Progress.textContent = `Progresso: ${pct}%`;
+  }
+
+  async function savePhase1(statusOverride = null) {
+    if (!__phase1RowId) throw new Error("Fase 1 não carregada.");
+
+    // atualiza pain_sentence
+    __phase1Json.pain_sentence = (phase1PainSentence?.value || "").trim();
+
+    const update = {
+      content_json: __phase1Json
+    };
+    if (statusOverride) update.status = statusOverride;
+
+    const { error } = await sb
+      .from("project_phases")
+      .update(update)
+      .eq("id", __phase1RowId);
+
+    if (error) throw error;
+  }
+
+  btnSavePhase1?.addEventListener("click", async () => {
+    try {
+      btnSavePhase1.disabled = true;
+      if (phase1Msg) phase1Msg.textContent = "Salvando…";
+      await savePhase1(null);
+      if (phase1Msg) phase1Msg.textContent = "Salvo ✅";
+    } catch (e) {
+      console.error(e);
+      if (phase1Msg) phase1Msg.textContent = "Erro ao salvar.";
+    } finally {
+      btnSavePhase1.disabled = false;
+    }
+  });
+
+  btnCompletePhase1?.addEventListener("click", async () => {
+    try {
+      btnCompletePhase1.disabled = true;
+
+      const pct = calcPhase1Percent();
+      if (pct < 100) {
+        if (phase1Msg) phase1Msg.textContent = "Complete as 5 respostas antes de concluir.";
+        return;
+      }
+
+      if (phase1Msg) phase1Msg.textContent = "Concluindo Fase 1…";
+      await savePhase1("completed");
+
+      // atualiza fase atual no projeto (depois vamos criar a Fase 2)
+      await sb.from("projects").update({ current_phase: 2 }).eq("id", __currentProjectId);
+
+      if (phase1Msg) phase1Msg.textContent = "Fase 1 concluída ✅ Próximo: Fase 2 (amanhã).";
+    } catch (e) {
+      console.error(e);
+      if (phase1Msg) phase1Msg.textContent = "Erro ao concluir fase.";
+    } finally {
+      btnCompletePhase1.disabled = false;
+    }
+  });
+
+
 
 
 </script>
