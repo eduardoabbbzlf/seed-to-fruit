@@ -1138,8 +1138,21 @@
     return msg.includes("aborterror") || msg.includes("signal is aborted");
   }
 
+  let __lastActiveProject = null;
+
+  function isTransientError(err) {
+    const msg = (err?.message || "").toLowerCase();
+    return (
+      msg.includes("aborterror") ||
+      msg.includes("signal is aborted") ||
+      msg.includes("timeout em projects.select(active)")
+    );
+  }
+
+
+
   async function getActiveProject(userId) {
-    async function run() {
+    async function run(timeoutMs) {
       const req = sb
         .from("projects")
         .select("*")
@@ -1148,48 +1161,65 @@
         .order("created_at", { ascending: false })
         .limit(1);
 
-      const { data, error } = await withTimeout(req, 8000, "projects.select(active)");
+      const { data, error } = await withTimeout(req, timeoutMs, "projects.select(active)");
       if (error) throw error;
+
       return data?.[0] || null;
     }
 
     try {
-      return await run();
+      // no retorno de aba, pode demorar: 15s
+      const p = await run(15000);
+      __lastActiveProject = p || __lastActiveProject;
+      return p;
     } catch (e) {
-      if (isAbortError(e)) {
-        console.warn("[SeedToFruit] AbortError ao buscar projeto. Retry 1x...");
-        await new Promise(r => setTimeout(r, 400));
-        return await run();
+      if (isTransientError(e)) {
+        console.warn("[SeedToFruit] erro transitório ao buscar projeto. Retry 1x...");
+        await new Promise(r => setTimeout(r, 500));
+
+        try {
+          const p2 = await run(15000);
+          __lastActiveProject = p2 || __lastActiveProject;
+          return p2;
+        } catch (e2) {
+          console.warn("[SeedToFruit] retry falhou, mantendo último projeto conhecido.");
+          return __lastActiveProject; // <<< NÃO some a UI
+        }
       }
-      throw e;
+      throw e; // erro real (RLS, permissão etc.)
     }
   }
+
 
 
   async function renderSeedToFruitState(session) {
     console.log("[SeedToFruit] renderSeedToFruitState()");
     const userId = session?.user?.id;
     console.log("[SeedToFruit] userId =", userId);
-
     if (!userId) return;
 
     let active = null;
     try {
       active = await getActiveProject(userId);
     } catch (e) {
-      console.error("[SeedToFruit] erro ao buscar projeto:", e);
+      console.error("[SeedToFruit] erro ao buscar projeto (não transitório):", e);
+      // aqui sim você pode decidir mostrar login ou uma mensagem
+      return;
     }
 
     console.log("[SeedToFruit] activeProject =", active);
 
     if (!active) {
+      // se não tem mesmo (e não é erro), mostra empty
       if (seedEmptyState) seedEmptyState.style.display = "block";
+      if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email}`;
       return;
     }
 
     if (seedEmptyState) seedEmptyState.style.display = "none";
     if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
   }
+
 
   async function createSeedProject(session) {
     const userId = session?.user?.id;
@@ -1366,6 +1396,7 @@
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) scheduleRehydrate("pageshow-bfcache");
   });
+
 </script>
 
 </body>
