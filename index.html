@@ -533,15 +533,13 @@
   window.__session = null;
 
   async function ensureSessionLoaded() {
-    // tenta carregar uma vez sem ficar chamando várias vezes
     if (window.__session) return window.__session;
-
     const { data, error } = await sb.auth.getSession();
     if (error) throw error;
-
     window.__session = data.session || null;
     return window.__session;
   }
+
 
 
 
@@ -916,7 +914,9 @@ window.logout = async function logout() {
       const { error } = await client.auth.signOut();
       if (error) throw error;
 
+      window.__session = null;
       console.log("logout: signOut OK -> forçando UI pro login");
+
 
       // força UI pro login imediatamente (não depende do onAuthStateChange)
       if (typeof window.showLogin === "function") window.showLogin("Você saiu da conta.");
@@ -992,6 +992,7 @@ window.logout = async function logout() {
     const session = window.__session || await ensureSessionLoaded();
     if (!session) throw new Error("Sessão não encontrada. Faça login novamente.");
 
+    await createSeedProject(session);
     await hydrateUserUI(session);
     showProfileView();
   });
