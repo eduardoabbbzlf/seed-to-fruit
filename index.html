@@ -896,52 +896,86 @@
 
   let __loggingOut = false;
 
-window.logout = async function logout() {
+  function uiForceToLogin(msg = "Você saiu da conta.") {
+    // limpa store
+    window.__session = null;
+
+    // fecha modal se estiver aberto
+    const ideaModalBack = document.getElementById("ideaModalBack");
+    if (ideaModalBack) ideaModalBack.style.display = "none";
+
+    // reseta views
+    const viewDashboard = document.getElementById("viewDashboard");
+    const viewProfile = document.getElementById("viewProfile");
+    if (viewProfile) viewProfile.style.display = "none";
+    if (viewDashboard) viewDashboard.style.display = "block";
+
+    // troca telas
+    const appRoot = document.getElementById("appRoot");
+    const authScreen = document.getElementById("authScreen");
+    if (appRoot) appRoot.style.display = "none";
+    if (authScreen) authScreen.style.display = "block";
+
+    // mensagem
+    if (typeof window.showLogin === "function") window.showLogin(msg);
+    else {
+      const authMsg = document.getElementById("authMsg");
+      if (authMsg) authMsg.textContent = msg;
+    }
+  }
+
+  function withTimeout(promise, ms, label) {
+    let t;
+    const timeout = new Promise((_, reject) => {
+      t = setTimeout(() => reject(new Error(`Timeout em ${label} (${ms}ms)`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+  }
+
+  window.logout = async function logout() {
     if (__loggingOut) return;
     __loggingOut = true;
+
+    const btnLogoutTop = document.getElementById("btnLogoutTop");
+    const btnGoProfile = document.getElementById("btnGoProfile");
 
     try {
       console.log("logout: clique");
 
-      // desabilita botão pra evitar spam
-      const btn = document.getElementById("btnLogoutTop");
-      if (btn) btn.disabled = true;
+      // desabilita botões durante o processo
+      if (btnLogoutTop) btnLogoutTop.disabled = true;
+      if (btnGoProfile) btnGoProfile.disabled = true;
 
       const client = window.__supabase;
       if (!client?.auth?.signOut) throw new Error("Supabase client/auth não disponível para signOut()");
 
       console.log("logout: calling signOut()");
-      const { error } = await client.auth.signOut();
-      if (error) throw error;
 
-      window.__session = null;
-      console.log("logout: signOut OK -> forçando UI pro login");
+      // tenta signOut, mas não deixa travar
+      await withTimeout(client.auth.signOut(), 6000, "signOut");
 
+      console.log("logout: signOut OK");
 
-      // força UI pro login imediatamente (não depende do onAuthStateChange)
-      if (typeof window.showLogin === "function") window.showLogin("Você saiu da conta.");
-      else {
-        // fallback
-        const appRoot = document.getElementById("appRoot");
-        const authScreen = document.getElementById("authScreen");
-        if (appRoot) appRoot.style.display = "none";
-        if (authScreen) authScreen.style.display = "block";
-      }
-
-      // opcional: limpar qualquer “estado visual” do dashboard
-      const seed = document.getElementById("seedEmptyState");
-      if (seed) seed.style.display = "none";
-
-      console.log("logout: OK");
+      // após signOut, o onAuthStateChange deve disparar,
+      // mas nós já garantimos a UI aqui
+      uiForceToLogin("Você saiu da conta.");
     } catch (e) {
       console.error("logout erro:", e);
-      alert("Falha ao sair. Veja o console.");
+
+      // fallback: mesmo se signOut travar/falhar, força UI pro login
+      uiForceToLogin("Você saiu da conta.");
+
+      // opcional: informar que foi um logout forçado (sem assustar)
+      // (se quiser, comente a linha acima e use abaixo)
+      // uiForceToLogin("Sessão encerrada (modo seguro).");
     } finally {
-      const btn = document.getElementById("btnLogoutTop");
-      if (btn) btn.disabled = false;
+      // reabilita botões
+      if (btnLogoutTop) btnLogoutTop.disabled = false;
+      if (btnGoProfile) btnGoProfile.disabled = false;
       __loggingOut = false;
     }
   };
+
 
 
   // =========================
