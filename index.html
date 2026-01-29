@@ -1283,6 +1283,61 @@
       btnCreateIdea.disabled = false;
     }
   });
+
+  // =========================
+  // Quando volta pra aba: re-hidrata sessão + UI
+  // =========================
+  let __rehydrating = false;
+
+  async function rehydrateApp(reason) {
+    if (__rehydrating) return;
+    __rehydrating = true;
+
+    try {
+      console.log(`[rehydrate] start (${reason})`);
+
+      const { data, error } = await withTimeout(sb.auth.getSession(), 8000, "rehydrate.getSession");
+      if (error) throw error;
+
+      const session = data.session || null;
+      window.__session = session;
+
+      if (!session) {
+        console.log("[rehydrate] sem sessão -> login");
+        showLogin();
+        return;
+      }
+
+      showApp();
+      showDashboardView();
+      await hydrateUserUI(session);
+
+      if (typeof renderSeedToFruitState === "function") {
+        await renderSeedToFruitState(session);
+      }
+
+      console.log("[rehydrate] done");
+    } catch (e) {
+      console.error("[rehydrate] erro:", e);
+      // fallback seguro: volta pro login se travar
+      showLogin("Sessão precisou ser recarregada. Faça login novamente.");
+    } finally {
+      __rehydrating = false;
+    }
+  }
+
+  // quando troca de aba e volta
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      rehydrateApp("visibilitychange");
+    }
+  });
+
+  // quando volta do cache do navegador (bfcache)
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) rehydrateApp("pageshow-bfcache");
+  });
+
 </script>
 
 </body>
