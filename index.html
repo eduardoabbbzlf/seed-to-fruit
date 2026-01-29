@@ -1080,15 +1080,17 @@
     console.log("[Auth] event:", event, "session:", !!session);
     window.__session = session || null;
 
-    if (!session) {
-      return showLogin();
-    }
+    if (!session) return showLogin();
 
-    showApp();
-    showDashboardView();
-    await hydrateUserUI(session);
-    if (typeof renderSeedToFruitState === "function") await renderSeedToFruitState(session);
+    // Render só em eventos importantes
+    if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      showApp();
+      showDashboardView();
+      await hydrateUserUI(session);
+      await renderSeedToFruitState(session);
+    }
   });
+
 
 
   window.bootAuthGate();
@@ -1131,18 +1133,38 @@
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  async function getActiveProject(userId) {
-    const { data, error } = await sb
-      .from("projects")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (error) throw error;
-    return data?.[0] || null;
+  function isAbortError(err) {
+    const msg = (err?.message || "").toLowerCase();
+    return msg.includes("aborterror") || msg.includes("signal is aborted");
   }
+
+  async function getActiveProject(userId) {
+    async function run() {
+      const req = sb
+        .from("projects")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const { data, error } = await withTimeout(req, 8000, "projects.select(active)");
+      if (error) throw error;
+      return data?.[0] || null;
+    }
+
+    try {
+      return await run();
+    } catch (e) {
+      if (isAbortError(e)) {
+        console.warn("[SeedToFruit] AbortError ao buscar projeto. Retry 1x...");
+        await new Promise(r => setTimeout(r, 400));
+        return await run();
+      }
+      throw e;
+    }
+  }
+
 
   async function renderSeedToFruitState(session) {
     console.log("[SeedToFruit] renderSeedToFruitState()");
@@ -1285,13 +1307,24 @@
   });
 
   // =========================
-  // Quando volta pra aba: re-hidrata sessão + UI
+  // Rehydrate ao voltar para a aba (anti-duplicação)
   // =========================
   let __rehydrating = false;
+  let __rehydrateCooldownUntil = 0;
+  let __rehydrateTimer = null;
 
   async function rehydrateApp(reason) {
+    const now = Date.now();
     if (__rehydrating) return;
+
+    // cooldown: evita disparar 2x em sequência (INITIAL_SESSION + visibilitychange)
+    if (now < __rehydrateCooldownUntil) {
+      console.log(`[rehydrate] skip (cooldown) reason=${reason}`);
+      return;
+    }
+
     __rehydrating = true;
+    __rehydrateCooldownUntil = now + 3000; // 3s de “janela segura”
 
     try {
       console.log(`[rehydrate] start (${reason})`);
@@ -1303,7 +1336,6 @@
       window.__session = session;
 
       if (!session) {
-        console.log("[rehydrate] sem sessão -> login");
         showLogin();
         return;
       }
@@ -1311,33 +1343,29 @@
       showApp();
       showDashboardView();
       await hydrateUserUI(session);
-
-      if (typeof renderSeedToFruitState === "function") {
-        await renderSeedToFruitState(session);
-      }
+      await renderSeedToFruitState(session);
 
       console.log("[rehydrate] done");
     } catch (e) {
       console.error("[rehydrate] erro:", e);
-      // fallback seguro: volta pro login se travar
-      showLogin("Sessão precisou ser recarregada. Faça login novamente.");
+      // não derruba para login por abort: é transitório
     } finally {
       __rehydrating = false;
     }
   }
 
-  // quando troca de aba e volta
+  function scheduleRehydrate(reason) {
+    clearTimeout(__rehydrateTimer);
+    __rehydrateTimer = setTimeout(() => rehydrateApp(reason), 250); // debounce 250ms
+  }
+
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      rehydrateApp("visibilitychange");
-    }
+    if (document.visibilityState === "visible") scheduleRehydrate("visibilitychange");
   });
 
-  // quando volta do cache do navegador (bfcache)
   window.addEventListener("pageshow", (e) => {
-    if (e.persisted) rehydrateApp("pageshow-bfcache");
+    if (e.persisted) scheduleRehydrate("pageshow-bfcache");
   });
-
 </script>
 
 </body>
