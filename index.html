@@ -595,12 +595,15 @@
   window.__session = null;
 
   async function ensureSessionLoaded() {
-    if (window.__session) return window.__session;
+    if (window.__session?.user?.id) return window.__session;
+
     const { data, error } = await sb.auth.getSession();
     if (error) throw error;
+
     window.__session = data.session || null;
     return window.__session;
   }
+
 
 
   // =========================
@@ -1105,17 +1108,41 @@
   }
 
   async function hydrateUserUI(session) {
-      const user = session?.user;
-      const email = user?.email || "—";
-      const provider = user?.user.app_metadata.provider || "—";
+    try {
+      const user = session?.user || null;
 
+      if (!user) {
+        console.warn("[hydrateUserUI] sem user (session inválida)", session);
+        // evita quebrar a UI
+        if (dashUserLine) dashUserLine.textContent = "Sessão não encontrada. Faça login novamente.";
+        if (profileEmail) profileEmail.textContent = "Email: —";
+        if (profileProvider) profileProvider.textContent = "Provider: —";
+        if (profileMeta) profileMeta.textContent = "";
+        return;
+      }
+
+      const email = user.email || "—";
+      const provider = String(user?.app_metadata?.provider || "—");
+
+      // Perfil
       if (profileEmail) profileEmail.textContent = `Email: ${email}`;
       if (profileProvider) profileProvider.textContent = `Provider: ${provider}`;
-      
+      if (profileMeta) profileMeta.textContent = JSON.stringify({
+        id: user.id,
+        app_metadata: user.app_metadata,
+        user_metadata: user.user_metadata,
+        created_at: user.created_at
+      }, null, 2);
+
+      // Dashboard (não atualiza no perfil se você quiser)
       if (window.__currentView !== "profile") {
-    if (dashUserLine) dashUserLine.textContent = `Logado como: ${email}`;
+        if (dashUserLine) dashUserLine.textContent = `Logado como: ${email}`;
+      }
+    } catch (e) {
+      console.error("[hydrateUserUI] erro:", e);
+    }
   }
-}
+
   
 
   btnGoProjects?.addEventListener("click", async () => {
@@ -1137,12 +1164,27 @@
   });
 
 
-  btnGoProfile?.addEventListener("click", async () => {
-    const session = window.__session || await ensureSessionLoaded();
-    if (!session) return showLogin("Sessão não encontrada. Faça login novamente.");
-    await hydrateUserUI(session);
-    showProfileView();
+  if (btnGoProfile) btnGoProfile.addEventListener("click", async () => {
+    try {
+      const { data, error } = await sb.auth.getSession();
+      if (error) throw error;
+
+      const session = data.session || null;
+      window.__session = session;
+
+      if (!session) {
+        showLogin("Sua sessão expirou. Faça login novamente.");
+        return;
+      }
+
+      await hydrateUserUI(session);
+      showProfileView();
+    } catch (e) {
+      console.error("[Perfil] erro ao abrir perfil:", e);
+      showLogin("Erro ao carregar sua sessão. Faça login novamente.");
+    }
   });
+
 
 
 
