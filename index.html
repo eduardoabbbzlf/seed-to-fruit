@@ -864,7 +864,7 @@
   setAuthMode("login");
 
   async function loginWithGoogle() {
-    const redirectTo = `${window.location.origin}/`;
+    const redirectTo = `${window.location.origin}/`; // sempre volta pra URL atual
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo }
@@ -1141,7 +1141,7 @@ window.logout = async function logout() {
       })
       .select("*")
       .single();
-    if (e1) throw e1;
+    if (e1) throw new Error(`projects.insert: ${e1.message}`);
 
     const phase1Questions = [
       "Quem vai usar isso?",
@@ -1160,7 +1160,7 @@ window.logout = async function logout() {
         status: "active",
         content_json: { who: usr, pain, questions: phase1Questions, answers: {} }
       });
-    if (e2) throw e2;
+    if (e2) throw new Error(`project_phases.insert: ${e2.message}`);
 
     const day = todayISODate();
     const routine = {
@@ -1182,7 +1182,7 @@ window.logout = async function logout() {
       })
       .select("*")
       .single();
-    if (e3) throw e3;
+    if (e3) throw new Error(`daily_plans.insert: ${e3.message}`);
 
     const tasks = [
       { daily_plan_id: daily.id, title: "Escrever a Frase da Dor", description: "Pessoas que _____ sofrem com _____ porque _____.", priority: 1, type: "focus", xp_reward: 20 },
@@ -1191,28 +1191,41 @@ window.logout = async function logout() {
     ];
 
     const { error: e4 } = await sb.from("tasks").insert(tasks);
-    if (e4) throw e4;
+    if (e4) throw new Error(`tasks.insert: ${e4.message}`);
 
     return proj;
   }
 
+  function withTimeout(promise, ms, label) {
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error(`Timeout em ${label} (${ms}ms)`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
   btnCreateIdea?.addEventListener("click", async () => {
     try {
       btnCreateIdea.disabled = true;
-      if (ideaModalMsg) ideaModalMsg.textContent = "Criando projeto…";
+      if (ideaModalMsg) ideaModalMsg.textContent = "1/4 Validando sessão…";
 
-      const { data: { session } } = await sb.auth.getSession();
+      const { data: { session }, error: sErr } = await withTimeout(sb.auth.getSession(), 8000, "getSession");
+      if (sErr) throw sErr;
       if (!session) throw new Error("Sessão não encontrada. Faça login novamente.");
 
-      await createSeedProject(session);
+      if (ideaModalMsg) ideaModalMsg.textContent = "2/4 Criando projeto…";
+      const proj = await withTimeout(createSeedProject(session), 15000, "createSeedProject");
 
-      if (ideaModalMsg) ideaModalMsg.textContent = "Projeto criado ✅";
+      if (ideaModalMsg) ideaModalMsg.textContent = "3/4 Atualizando tela…";
       closeIdeaModal();
 
-      await renderSeedToFruitState(session);
+      await withTimeout(renderSeedToFruitState(session), 8000, "renderSeedToFruitState");
+
+      if (ideaModalMsg) ideaModalMsg.textContent = "4/4 Pronto ✅";
+      console.log("[SeedToFruit] Projeto criado:", proj);
     } catch (e) {
-      console.error(e);
-      if (ideaModalMsg) ideaModalMsg.textContent = e.message || "Falha ao criar projeto.";
+      console.error("[SeedToFruit] erro ao criar projeto:", e);
+      if (ideaModalMsg) ideaModalMsg.textContent = e?.message || "Falha ao criar projeto.";
     } finally {
       btnCreateIdea.disabled = false;
     }
