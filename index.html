@@ -481,6 +481,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+  let __pauseProjectFetchUntil = 0;
+
+  function pauseProjectFetch(ms, why) {
+    __pauseProjectFetchUntil = Date.now() + ms;
+    console.log(`[SeedToFruit] pause fetch ${ms}ms (${why})`);
+  }
+
+  function isProjectFetchPaused() {
+    return Date.now() < __pauseProjectFetchUntil;
+  }
+
+
   window.__scriptLoads = (window.__scriptLoads || 0) + 1;
   console.log("[APP] script loads:", window.__scriptLoads);
 
@@ -938,6 +950,8 @@
 
     console.log("logout: clique (instant)");
     uiForceToLogin("Você saiu da conta.");
+    clearCachedProject();
+
 
     // tenta signOut, mas não bloqueia a experiência
     try {
@@ -1048,26 +1062,23 @@
 
     if (!session) return showLogin();
 
-    // evita render duplicado em menos de 2s
-    const now = Date.now();
-    const shouldRender =
-      (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") &&
-      (now - __lastAuthRenderAt > 2000);
-
-    if (!shouldRender) return;
-
-    __lastAuthRenderAt = now;
-
+    // atualiza UI leve sempre
     showApp();
     showDashboardView();
     await hydrateUserUI(session);
-    await renderSeedToFruitState(session);
 
-    // se houver token no hash, limpa para não “reprocessar”
-    if ((window.location.hash || "").includes("access_token")) {
-      history.replaceState({}, document.title, window.location.pathname);
+    // Se token foi refreshed, NÃO busque projeto agora (janela ruim)
+    if (event === "TOKEN_REFRESHED") {
+      pauseProjectFetch(5000, "TOKEN_REFRESHED"); // 5s
+      return; // <<< evita render duplicado + abort
+    }
+
+    // Para SIGNED_IN / INITIAL_SESSION, renderiza normal
+    if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+      await renderSeedToFruitState(session);
     }
   });
+
 
 
 
@@ -1188,11 +1199,19 @@
     } catch {}
   }
 
+  function clearCachedProject() {
+  try {
+    localStorage.removeItem(ACTIVE_PROJECT_CACHE_KEY);
+  } catch {}
+  __activeProjectCache = null;
+}
+
   // carrega ao iniciar
   __activeProjectCache = loadCachedProject();
 
 
-  async function renderSeedToFruitState(session) {
+  async function renderSeedToFruitState(session, opts = {}) {
+    const allowFetch = opts.allowFetch !== false; // default true
     console.log("[SeedToFruit] renderSeedToFruitState()");
     const userId = session?.user?.id;
     console.log("[SeedToFruit] userId =", userId);
@@ -1227,6 +1246,17 @@
     if (seedEmptyState) seedEmptyState.style.display = "none";
     if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
   }
+
+  if (!allowFetch) {
+    console.log("[SeedToFruit] render (sem fetch) por opts");
+    return;
+  }
+
+  if (isProjectFetchPaused()) {
+    console.log("[SeedToFruit] fetch pausado, mantendo cache");
+    return;
+  }
+
 
 
   async function createSeedProject(session) {
@@ -1307,6 +1337,9 @@
     if (e4) throw new Error(`tasks.insert: ${e4.message}`);
 
     return proj;
+
+    __activeProjectCache = proj;
+    saveCachedProject(proj);
   }
 
   function withTimeout(promise, ms, label) {
@@ -1343,6 +1376,13 @@
       btnCreateIdea.disabled = false;
     }
   });
+
+  const active = await getActiveProject(userId);
+    if (active) {
+      __activeProjectCache = active;
+      saveCachedProject(active);
+    }
+
 
   let __rehydrating = false;
   let __rehydrateCooldownUntil = 0;
@@ -1388,7 +1428,13 @@
               !__activeProjectCache || (Date.now() - __lastProjectRefreshAt > 10000);
 
             if (needsRefresh) {
-              await renderSeedToFruitState(memSession);
+              // pinta com cache e adia fetch real se estiver em janela ruim
+              await renderSeedToFruitState(memSession, { allowFetch: false });
+
+              setTimeout(() => {
+                const s = window.__session;
+                if (s?.user?.id) renderSeedToFruitState(s, { allowFetch: true });
+              }, 2500);
               __lastProjectRefreshAt = Date.now();
             } else {
               console.log("[rehydrate] skip project refresh (cache recente)");
