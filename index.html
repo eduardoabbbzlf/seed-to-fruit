@@ -603,6 +603,48 @@
   }
 
 
+  // =========================
+  // Router mínimo (TOP do script)
+  // =========================
+  const APP_VIEW_KEY = "seedtofruit:view";
+  window.__currentView = sessionStorage.getItem(APP_VIEW_KEY) || "dashboard";
+
+  function setView(name) {
+    window.__currentView = name;
+    sessionStorage.setItem(APP_VIEW_KEY, name);
+  }
+
+  // pega elementos sempre que aplicar (seguro mesmo se ainda não existirem)
+  function applyView() {
+    const viewDashboard = document.getElementById("viewDashboard");
+    const viewProjects = document.getElementById("viewProjects");
+    const viewProjectDetail = document.getElementById("viewProjectDetail");
+    const viewProfile = document.getElementById("viewProfile");
+
+    // esconde tudo
+    if (viewDashboard) viewDashboard.style.display = "none";
+    if (viewProjects) viewProjects.style.display = "none";
+    if (viewProjectDetail) viewProjectDetail.style.display = "none";
+    if (viewProfile) viewProfile.style.display = "none";
+
+    // mostra a atual
+    const v = window.__currentView;
+    if (v === "dashboard" && viewDashboard) viewDashboard.style.display = "block";
+    if (v === "projects" && viewProjects) viewProjects.style.display = "block";
+    if (v === "projectDetail" && viewProjectDetail) viewProjectDetail.style.display = "block";
+    if (v === "profile" && viewProfile) viewProfile.style.display = "block";
+  }
+
+  function canRenderProjectsHere() {
+    const v = window.__currentView;
+    return v === "dashboard" || v === "projects" || v === "projectDetail";
+  }
+
+  // helpers (opcionais, mas deixa seu código mais limpo)
+  function showDashboardView(){ setView("dashboard"); applyView(); }
+  function showProjectsView(){ setView("projects"); applyView(); }
+  function showProjectDetailView(){ setView("projectDetail"); applyView(); }
+  function showProfileView(){ setView("profile"); applyView(); }
 
 
   // =========================
@@ -1131,9 +1173,12 @@
       if (!session) return showLogin();
 
       showApp();
-      showDashboardView();
+      applyView();
       await hydrateUserUI(session);
-      await renderSeedToFruitState(session);
+
+      if (canRenderProjectsHere()) {
+        await renderSeedToFruitState(session);
+      }
     } catch (e) {
       console.error("[boot] erro:", e);
       showLogin();
@@ -1155,6 +1200,8 @@
     showDashboardView();
     await hydrateUserUI(session);
 
+    if (!session) return showLogin();
+
     // Se token foi refreshed, NÃO busque projeto agora (janela ruim)
     if (event === "TOKEN_REFRESHED") {
       pauseProjectFetch(5000, "TOKEN_REFRESHED"); // 5s
@@ -1163,11 +1210,10 @@
 
     // Para SIGNED_IN / INITIAL_SESSION, renderiza normal
     if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-          applyView();
-    if (__currentView !== "profile") {
+    if (canRenderProjectsHere()) {
       await renderSeedToFruitState(session);
     }
-    } 
+  }
   });
 
 
@@ -1312,9 +1358,8 @@
 
 
   async function renderSeedToFruitState(session, opts = {}) {
-      if (!canRenderProjectsHere()) {
-        return;
-    } 
+      if (!canRenderProjectsHere())return;
+      
     const allowFetch = opts.allowFetch !== false; // default true
     console.log("[SeedToFruit] renderSeedToFruitState()");
     const userId = session?.user?.id;
