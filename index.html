@@ -1099,28 +1099,24 @@
 
   function showProfileView() {
     if (viewDashboard) viewDashboard.style.display = "none";
+    if (viewProjects) viewProjects.style.display = "none";
+    if (viewProjectDetail) viewProjectDetail.style.display = "none";
     if (viewProfile) viewProfile.style.display = "block";
   }
 
   async function hydrateUserUI(session) {
-    try {
       const user = session?.user;
       const email = user?.email || "—";
-      const provider = (user?.app_metadata?.provider) ? String(user.app_metadata.provider) : "—";
+      const provider = user?.user.app_metadata.provider || "—";
 
-      if (dashUserLine) dashUserLine.textContent = `Logado como: ${email}`;
       if (profileEmail) profileEmail.textContent = `Email: ${email}`;
       if (profileProvider) profileProvider.textContent = `Provider: ${provider}`;
-      if (profileMeta) profileMeta.textContent = JSON.stringify({
-        id: user?.id,
-        app_metadata: user?.app_metadata,
-        user_metadata: user?.user_metadata,
-        created_at: user?.created_at
-      }, null, 2);
-    } catch (e) {
-      console.error("hydrateUserUI erro:", e);
-    }
+      
+      if (window.__currentView !== "profile") {
+    if (dashUserLine) dashUserLine.textContent = `Logado como: ${email}`;
   }
+}
+  
 
   btnGoProjects?.addEventListener("click", async () => {
     const session = window.__session || await ensureSessionLoaded();
@@ -1358,8 +1354,9 @@
 
 
   async function renderSeedToFruitState(session, opts = {}) {
+      if (window.__currentView === "profile") return; // trava total
       if (!canRenderProjectsHere())return;
-      
+
     const allowFetch = opts.allowFetch !== false; // default true
     console.log("[SeedToFruit] renderSeedToFruitState()");
     const userId = session?.user?.id;
