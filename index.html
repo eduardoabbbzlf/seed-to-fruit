@@ -1871,6 +1871,7 @@
 
     if (phase1QuestionsWrap) {
       phase1QuestionsWrap.innerHTML = "";
+      __phase1Json.answers = Array.isArray(__phase1Json.answers) ? __phase1Json.answers : [];
       q.forEach((question, idx) => {
         const box = document.createElement("div");
         box.className = "q";
@@ -1891,18 +1892,44 @@
     updatePhase1Progress();
   }
 
-  function calcPhase1Percent() {
-    const answers = __phase1Json?.answers || [];
-    const filled = answers.filter(x => String(x || "").trim().length > 0).length;
-    const total = 5;
-    return Math.round((filled / total) * 100);
+  function calcPhase1Percent(answers, questionsCount = 5) {
+    // answers pode vir:
+    // 1) array: [{answer:"..."}, ...] ou ["...", "..."]
+    // 2) objeto: { q1:"...", q2:"..." }
+
+    let filled = 0;
+
+    if (Array.isArray(answers)) {
+      filled = answers.filter(v => {
+        const text = (typeof v === "string") ? v : (v?.answer ?? v?.value ?? "");
+        return String(text).trim().length > 0;
+      }).length;
+
+      const total = Math.max(questionsCount, answers.length || questionsCount);
+      return Math.round((filled / total) * 100);
+    }
+
+    if (answers && typeof answers === "object") {
+      const values = Object.values(answers);
+      filled = values.filter(v => String(v ?? "").trim().length > 0).length;
+
+      const total = Math.max(questionsCount, values.length || questionsCount);
+      return Math.round((filled / total) * 100);
+    }
+
+    return 0;
   }
 
+
   function updatePhase1Progress() {
-    if (!__phase1Json) return;
-    const pct = calcPhase1Percent();
+    const questions = __phase1Json?.questions || [];
+    const answers = __phase1Json?.answers || [];
+    const pct = calcPhase1Percent(answers, questions.length || 5);
+
     if (phase1Progress) phase1Progress.textContent = `Progresso: ${pct}%`;
+    return pct;
   }
+
 
   async function savePhase1(statusOverride = null) {
     if (!__phase1RowId) throw new Error("Fase 1 não carregada.");
@@ -1941,16 +1968,17 @@
     try {
       btnCompletePhase1.disabled = true;
 
-      const pct = calcPhase1Percent();
+      const pct = updatePhase1Progress();
+      const total = (__phase1Json?.questions?.length || 5);
+
       if (pct < 100) {
-        if (phase1Msg) phase1Msg.textContent = "Complete as 5 respostas antes de concluir.";
+        if (phase1Msg) phase1Msg.textContent = `Complete as ${total} respostas antes de concluir. (${pct}%)`;
         return;
       }
 
       if (phase1Msg) phase1Msg.textContent = "Concluindo Fase 1…";
       await savePhase1("completed");
 
-      // atualiza fase atual no projeto (depois vamos criar a Fase 2)
       await sb.from("projects").update({ current_phase: 2 }).eq("id", __currentProjectId);
 
       if (phase1Msg) phase1Msg.textContent = "Fase 1 concluída ✅ Próximo: Fase 2 (amanhã).";
@@ -1961,6 +1989,8 @@
       btnCompletePhase1.disabled = false;
     }
   });
+
+
 
 
 
