@@ -1336,30 +1336,53 @@
     }
   });
 
-  // =========================
-  // Rehydrate ao voltar para a aba (anti-duplicação)
-  // =========================
   let __rehydrating = false;
   let __rehydrateCooldownUntil = 0;
   let __rehydrateTimer = null;
+
+  async function tryGetSessionSafe() {
+    // tenta com timeout maior e 1 retry
+    try {
+      return await withTimeout(sb.auth.getSession(), 15000, "rehydrate.getSession");
+    } catch (e) {
+      const msg = (e?.message || "").toLowerCase();
+      if (msg.includes("timeout")) {
+        console.warn("[rehydrate] getSession timeout, retry 1x...");
+        await new Promise(r => setTimeout(r, 700));
+        return await withTimeout(sb.auth.getSession(), 15000, "rehydrate.getSession.retry");
+      }
+      throw e;
+    }
+  }
 
   async function rehydrateApp(reason) {
     const now = Date.now();
     if (__rehydrating) return;
 
-    // cooldown: evita disparar 2x em sequência (INITIAL_SESSION + visibilitychange)
     if (now < __rehydrateCooldownUntil) {
       console.log(`[rehydrate] skip (cooldown) reason=${reason}`);
       return;
     }
 
     __rehydrating = true;
-    __rehydrateCooldownUntil = now + 3000; // 3s de “janela segura”
+    __rehydrateCooldownUntil = now + 3000;
 
     try {
       console.log(`[rehydrate] start (${reason})`);
 
-      const { data, error } = await withTimeout(sb.auth.getSession(), 8000, "rehydrate.getSession");
+      // 1) Caminho rápido: se já temos sessão em memória, só re-renderiza.
+      const memSession = window.__session;
+      if (memSession?.user?.id) {
+        showApp();
+        showDashboardView();
+        await hydrateUserUI(memSession);
+        await renderSeedToFruitState(memSession);
+        console.log("[rehydrate] done (memory session)");
+        return;
+      }
+
+      // 2) Fallback: só se não tiver sessão em memória, tenta getSession com segurança
+      const { data, error } = await tryGetSessionSafe();
       if (error) throw error;
 
       const session = data.session || null;
@@ -1367,6 +1390,7 @@
 
       if (!session) {
         showLogin();
+        console.log("[rehydrate] done (no session)");
         return;
       }
 
@@ -1377,8 +1401,17 @@
 
       console.log("[rehydrate] done");
     } catch (e) {
-      console.error("[rehydrate] erro:", e);
-      // não derruba para login por abort: é transitório
+      // Importante: NÃO derrubar UI por timeout do getSession.
+      console.error("[rehydrate] erro (ignorado para não travar UI):", e);
+
+      // Se não conseguiu rehydrate, mas existe sessão em memória, mantém a tela.
+      if (window.__session?.user?.id) {
+        console.log("[rehydrate] mantendo sessão em memória");
+        return;
+      }
+
+      // Se não tem sessão em memória e falhou, volta pro login com mensagem leve
+      showLogin("Reconectando… tente novamente.");
     } finally {
       __rehydrating = false;
     }
@@ -1386,7 +1419,7 @@
 
   function scheduleRehydrate(reason) {
     clearTimeout(__rehydrateTimer);
-    __rehydrateTimer = setTimeout(() => rehydrateApp(reason), 250); // debounce 250ms
+    __rehydrateTimer = setTimeout(() => rehydrateApp(reason), 250);
   }
 
   document.addEventListener("visibilitychange", () => {
@@ -1396,6 +1429,7 @@
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) scheduleRehydrate("pageshow-bfcache");
   });
+
 
 </script>
 
