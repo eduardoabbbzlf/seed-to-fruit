@@ -1942,10 +1942,90 @@
   let __phase1RowId = null; // id do project_phases (linha)
   let __phase1Json = null;  // content_json em memória
 
+
+  function getPhaseTemplate(phaseNumber) {
+    if (phaseNumber === 1) {
+      return {
+        title: "Clareza da Dor",
+        questions: [
+          "Quem vai usar isso?",
+          "O que essa pessoa tenta fazer hoje e não consegue bem?",
+          "O que ela reclama com frequência?",
+          "O que ela perde por causa disso? (tempo, dinheiro, esforço, estresse)",
+          "Se esse problema desaparecesse, o que mudaria na vida dela?"
+        ]
+      };
+    }
+
+    if (phaseNumber === 2) {
+      return {
+        title: "Solução em linguagem simples",
+        questions: [
+          "Se eu estivesse ao lado dessa pessoa, o que eu faria por ela agora?",
+          "Qual a primeira ajuda que já traria valor?",
+          "O que pode ser entregue feio, mas útil?",
+          "O que pode esperar para depois?",
+          "O que definitivamente NÃO é necessário agora?"
+        ]
+      };
+    }
+
+    // fallback (caso você avance para novas fases depois)
+    return {
+      title: `Fase ${phaseNumber}`,
+      questions: []
+    };
+  }
+
+
+  async function ensurePhaseExists(projectId, phaseNumber) {
+    const { data, error } = await sb
+      .from("project_phases")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("phase_number", phaseNumber)
+      .limit(1);
+
+    if (error) throw new Error(`project_phases.select(phase ${phaseNumber}): ${error.message}`);
+
+    // já existe
+    if (data && data[0]) return data[0];
+
+    // cria
+    const t = getPhaseTemplate(phaseNumber);
+
+    const { data: created, error: e2 } = await sb
+      .from("project_phases")
+      .insert({
+        project_id: projectId,
+        phase_number: phaseNumber,
+        phase_title: t.title,
+        status: "active",
+        content_json: {
+          questions: t.questions,
+          answers: Array.isArray(t.questions) ? t.questions.map(() => "") : {},
+        }
+      })
+      .select("*")
+      .single();
+
+    if (e2) throw new Error(`project_phases.insert(phase ${phaseNumber}): ${e2.message}`);
+
+    return created;
+  }
+
+
+
   async function renderProjectDetail(session, projectId) {
     __currentProjectId = projectId;
+
+    // reset fase 1
     __phase1RowId = null;
     __phase1Json = null;
+
+    // (se você já tem fase 2, recomendo criar esses globals também)
+    window.__phase2RowId = null;
+    window.__phase2Json = null;
 
     if (phase1Msg) phase1Msg.textContent = "Carregando…";
 
@@ -1962,63 +2042,51 @@
       return;
     }
 
+    const currentPhase = Number(proj.current_phase || 1);
+
     if (projectTitle) projectTitle.textContent = proj.title || "Projeto";
     if (projectMetaLine) projectMetaLine.textContent =
-      `Status: ${proj.status} • Fase atual: ${proj.current_phase || 1}`;
+      `Status: ${proj.status} • Fase atual: ${currentPhase}`;
 
-    // 2) Carrega Fase 1
-    const { data: ph, error: e2 } = await sb
-      .from("project_phases")
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("phase_number", 1)
-      .limit(1);
+    try {
+      // 2) Garante que a Fase 1 existe (histórico/robustez)
+      const phase1Row = await ensurePhaseExists(projectId, 1);
+      __phase1RowId = phase1Row.id;
+      __phase1Json = phase1Row.content_json || {};
 
-    if (e2) {
-      console.error("phase1 load error:", e2);
-      if (phase1Msg) phase1Msg.textContent = "Erro ao carregar Fase 1.";
-      return;
-    }
+      // 3) Garante que a Fase ATUAL existe (isso resolve seu problema real)
+      const phaseCurrentRow = await ensurePhaseExists(projectId, currentPhase);
 
-    const row = (ph && ph[0]) ? ph[0] : null;
-    if (!row) {
-      // Se por algum motivo não existir, cria (robustez)
-      const defaultQ = [
-        "Quem vai usar isso?",
-        "O que essa pessoa tenta fazer hoje e não consegue bem?",
-        "O que ela reclama com frequência?",
-        "O que ela perde por causa disso? (tempo, dinheiro, esforço, estresse)",
-        "Se esse problema desaparecesse, o que mudaria na vida dela?"
-      ];
+      // 4) Carrega JSON da fase atual em memória (para UI)
+      if (currentPhase === 1) {
+        // já setamos acima, só pinta
+        paintPhase1UI();
+      } else if (currentPhase === 2) {
+        window.__phase2RowId = phaseCurrentRow.id;
+        window.__phase2Json = phaseCurrentRow.content_json || {};
 
-      const { data: created, error: e3 } = await sb
-        .from("project_phases")
-        .insert({
-          project_id: projectId,
-          phase_number: 1,
-          phase_title: "Clareza da Dor",
-          status: "active",
-          content_json: { pain_sentence: "", questions: defaultQ, answers: ["","","","",""] }
-        })
-        .select("*")
-        .single();
-
-      if (e3) {
-        console.error("phase1 create error:", e3);
-        if (phase1Msg) phase1Msg.textContent = "Erro ao criar Fase 1.";
-        return;
+        // se você já tem paintPhase2UI, chama aqui:
+        if (typeof paintPhase2UI === "function") {
+          paintPhase2UI();
+        } else {
+          // fallback: se ainda não existe UI fase 2, pelo menos não quebra
+          console.warn("paintPhase2UI não existe ainda. Mostrando fase 1 por enquanto.");
+          paintPhase1UI();
+        }
+      } else {
+        // outras fases no futuro
+        console.warn("Fase atual não tem UI ainda:", currentPhase);
+        paintPhase1UI();
       }
 
-      __phase1RowId = created.id;
-      __phase1Json = created.content_json;
-    } else {
-      __phase1RowId = row.id;
-      __phase1Json = row.content_json || {};
-    }
+      if (phase1Msg) phase1Msg.textContent = "";
 
-    paintPhase1UI();
-    if (phase1Msg) phase1Msg.textContent = "";
+    } catch (e) {
+      console.error("renderProjectDetail error:", e);
+      if (phase1Msg) phase1Msg.textContent = "Erro ao carregar fases do projeto.";
+    }
   }
+
 
   function paintPhase1UI() {
     const q = __phase1Json?.questions || [];
@@ -2137,6 +2205,7 @@
       await savePhase1("completed");
 
       await sb.from("projects").update({ current_phase: 2 }).eq("id", __currentProjectId);
+      await ensurePhaseExists(__currentProjectId, 2);
 
       if (phase1Msg) phase1Msg.textContent = "Fase 1 concluída ✅ Próximo: Fase 2 (amanhã).";
     } catch (e) {
