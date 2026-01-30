@@ -1182,7 +1182,16 @@
       }
     } catch (e) {
       console.error("[hydrateUserUI] erro:", e);
-    }
+      }
+      setTodayMeta("Usuário carregado ✅ buscando projeto…");
+  }
+
+
+
+  function setTodayMeta(text) {
+    const el = document.getElementById("todayMeta");
+    if (!el) return;
+    el.textContent = text;
   }
 
   
@@ -1252,6 +1261,8 @@
 
       if (!session) return showLogin();
 
+      setTodayMeta("Sessão OK ✅ carregando seu projeto…");
+
       showApp();
       applyView();
       await hydrateUserUI(session);
@@ -1279,6 +1290,9 @@
     showApp();
     showDashboardView();
     await hydrateUserUI(session);
+
+    setTodayMeta("Sessão OK ✅ atualizando…");
+
 
     if (!session) return showLogin();
 
@@ -1541,6 +1555,20 @@
       }
     }
 
+    if (__activeProjectCache?.title) {
+      setTodayMeta(`Projeto ativo: ${__activeProjectCache.title} (cache)`);
+    } else {
+      setTodayMeta("Buscando projeto…");
+    }
+
+
+    if (!active) {
+      setTodayMeta("Sem projeto ativo. Clique em “Adicionar ideia”.");
+    } else {
+      setTodayMeta(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
+    }
+
+
     // 2) se opts mandou não buscar, para aqui (mas UI já foi pintada)
     if (!allowFetch) {
       console.log("[SeedToFruit] render (sem fetch) por opts");
@@ -1550,6 +1578,11 @@
     // 3) se estamos na janela ruim (token refresh), não busca agora
     if (isProjectFetchPaused()) {
       console.log("[SeedToFruit] fetch pausado, mantendo cache");
+
+      setTodayMeta(__activeProjectCache?.title
+        ? `Projeto ativo: ${__activeProjectCache.title} (mantido)`
+        : "Aguardando estabilizar sessão…"
+      );
       return;
     }
 
