@@ -1535,18 +1535,28 @@
     return (__currentView === "dashboard" || __currentView === "projects" || __currentView === "projectDetail");
   }
 
+  function setTodayMeta(text) {
+    const el = document.getElementById("todayMeta");
+    if (!el) return;
+    el.textContent = text;
+  }
+
 
   async function renderSeedToFruitState(session, opts = {}) {
-      if (window.__currentView === "profile") return; // trava total
-      if (!canRenderProjectsHere())return;
-
     const allowFetch = opts.allowFetch !== false; // default true
     console.log("[SeedToFruit] renderSeedToFruitState()");
     const userId = session?.user?.id;
     console.log("[SeedToFruit] userId =", userId);
     if (!userId) return;
 
-    // 1) pinta rápido com cache (zero travamento)
+    // 0) Sempre atualiza o "Hoje" com algo imediato (sem depender do banco)
+    if (__activeProjectCache?.title) {
+      setTodayMeta(`Projeto ativo: ${__activeProjectCache.title} (cache)`);
+    } else {
+      setTodayMeta("Sessão OK ✅ buscando projeto…");
+    }
+
+    // 1) Pinta rápido com cache no topo do dashboard
     if (__activeProjectCache?.id) {
       if (seedEmptyState) seedEmptyState.style.display = "none";
       if (dashUserLine) {
@@ -1555,30 +1565,14 @@
       }
     }
 
-    if (__activeProjectCache?.title) {
-      setTodayMeta(`Projeto ativo: ${__activeProjectCache.title} (cache)`);
-    } else {
-      setTodayMeta("Buscando projeto…");
-    }
-
-
-    if (!active) {
-      setTodayMeta("Sem projeto ativo. Clique em “Adicionar ideia”.");
-    } else {
-      setTodayMeta(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
-    }
-
-
-    // 2) se opts mandou não buscar, para aqui (mas UI já foi pintada)
+    // 2) Se não pode buscar agora, para aqui (mantém UI responsiva)
     if (!allowFetch) {
       console.log("[SeedToFruit] render (sem fetch) por opts");
       return;
     }
 
-    // 3) se estamos na janela ruim (token refresh), não busca agora
     if (isProjectFetchPaused()) {
       console.log("[SeedToFruit] fetch pausado, mantendo cache");
-
       setTodayMeta(__activeProjectCache?.title
         ? `Projeto ativo: ${__activeProjectCache.title} (mantido)`
         : "Aguardando estabilizar sessão…"
@@ -1586,37 +1580,38 @@
       return;
     }
 
-    // 4) busca no banco
+    // 3) Agora sim: busca real no banco
     let active = null;
     try {
       active = await getActiveProject(userId);
     } catch (e) {
       console.error("[SeedToFruit] erro ao buscar projeto (não transitório):", e);
+      setTodayMeta("Erro ao carregar projeto. Tente atualizar a página.");
       return;
     }
 
     console.log("[SeedToFruit] activeProject =", active);
 
-    // 5) se não tem projeto ativo, mostra empty
+    // 4) Se não tem projeto ativo
     if (!active) {
       if (seedEmptyState) seedEmptyState.style.display = "block";
       if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email}`;
+      setTodayMeta("Sem projeto ativo. Clique em “Adicionar ideia”.");
       return;
     }
 
-    await renderTodayOnDashboard(session, active);
-
-    // 6) atualiza cache (agora confirmado pelo banco)
+    // 5) Tem projeto ativo: atualiza cache + UI
     __activeProjectCache = active;
     saveCachedProject(active);
-    __lastProjectRefreshAt = Date.now();
 
-    // 7) atualiza UI final
     if (seedEmptyState) seedEmptyState.style.display = "none";
     if (dashUserLine) {
-      dashUserLine.textContent = `Logado como: ${session.user.email} • Projeto: ${active.title}`;
+      dashUserLine.textContent =
+        `Logado como: ${session.user.email} • Projeto: ${active.title}`;
     }
+    setTodayMeta(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
   }
+
 
 
 
