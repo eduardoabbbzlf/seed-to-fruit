@@ -2295,6 +2295,10 @@
 
       console.log("[Phase1] projects.update OK:", updProj);
 
+      if (phase1Msg) phase1Msg.textContent = "Fase 1 concluída ✅ Indo para Fase 2…";
+      await renderProjectDetail(window.__session, __currentProjectId);
+
+
       // 3) garante fase 2
       await ensurePhaseExists(__currentProjectId, 2);
 
