@@ -1361,7 +1361,7 @@
 
     // Se token foi refreshed, NÃO busque projeto agora (janela ruim)
     if (event === "TOKEN_REFRESHED") {
-      pauseProjectFetch(5000, "TOKEN_REFRESHED"); // 5s
+      pauseProjectFetch(9000, "TOKEN_REFRESHED"); // 9s
       return; // <<< evita render duplicado + abort
     }
 
@@ -2228,21 +2228,26 @@
   async function savePhase1(statusOverride = null) {
     if (!__phase1RowId) throw new Error("Fase 1 não carregada.");
 
-    // atualiza pain_sentence
     __phase1Json.pain_sentence = (phase1PainSentence?.value || "").trim();
 
-    const update = {
-      content_json: __phase1Json
-    };
+    const update = { content_json: __phase1Json };
     if (statusOverride) update.status = statusOverride;
 
-    const { error } = await sb
+    const { data, error } = await sb
       .from("project_phases")
       .update(update)
-      .eq("id", __phase1RowId);
+      .eq("id", __phase1RowId)
+      .select("id,status")
+      .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("savePhase1 error:", error);
+      throw new Error(error.message || "Falha ao salvar Fase 1");
+    }
+
+    console.log("[Phase1] project_phases.update OK:", data);
   }
+
 
   btnSavePhase1?.addEventListener("click", async () => {
     try {
@@ -2271,19 +2276,53 @@
       }
 
       if (phase1Msg) phase1Msg.textContent = "Concluindo Fase 1…";
+
+      // 1) salva fase 1 e confirma retorno
       await savePhase1("completed");
 
-      await sb.from("projects").update({ current_phase: 2 }).eq("id", __currentProjectId);
+      // 2) avança projeto para fase 2 (COM checagem)
+      const { data: updProj, error: eProj } = await sb
+        .from("projects")
+        .update({ current_phase: 2 })
+        .eq("id", __currentProjectId)
+        .select("id,current_phase")
+        .single();
+
+      if (eProj) {
+        console.error("projects.update current_phase error:", eProj);
+        throw new Error(eProj.message || "Falha ao avançar fase do projeto");
+      }
+
+      console.log("[Phase1] projects.update OK:", updProj);
+
+      // 3) garante fase 2
       await ensurePhaseExists(__currentProjectId, 2);
 
-      if (phase1Msg) phase1Msg.textContent = "Fase 1 concluída ✅ Próximo: Fase 2 (amanhã).";
+      // 4) confere do banco se fase atual é 2
+      const { data: check, error: eCheck } = await sb
+        .from("projects")
+        .select("current_phase")
+        .eq("id", __currentProjectId)
+        .single();
+
+      if (eCheck) throw eCheck;
+
+      if (Number(check.current_phase) !== 2) {
+        throw new Error("Banco não confirmou avanço para Fase 2.");
+      }
+
+      // 5) agora sim: renderiza a Fase 2 imediatamente (sem 'amanhã')
+      if (phase1Msg) phase1Msg.textContent = "Fase 1 concluída ✅ Indo para Fase 2…";
+      await renderProjectDetail(window.__session, __currentProjectId);
+
     } catch (e) {
-      console.error(e);
-      if (phase1Msg) phase1Msg.textContent = "Erro ao concluir fase.";
+      console.error("[Phase1] concluir error:", e);
+      if (phase1Msg) phase1Msg.textContent = `Erro ao concluir fase: ${e?.message || "ver console"}`;
     } finally {
       btnCompletePhase1.disabled = false;
     }
   });
+
 
   btnSavePhase2?.addEventListener("click", async () => {
     try {
