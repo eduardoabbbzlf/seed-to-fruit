@@ -1286,29 +1286,58 @@
   }
 
   window.bootAuthGate = async function bootAuthGate() {
-    try {
-      const { data, error } = await withTimeout(sb.auth.getSession(), 15000, "boot.getSession");
-      if (error) throw error;
+  // 1) Não trava a tela esperando auth
+  showLogin("Carregando sessão…");
 
-      const session = data.session || null;
-      window.__session = session;
+  async function getSessionWithRetry() {
+    // tenta 3 vezes: 15s, 20s, 25s
+    const tries = [
+      { t: 15000, wait: 600 },
+      { t: 20000, wait: 900 },
+      { t: 25000, wait: 1200 },
+    ];
 
-      if (!session) return showLogin();
+    let lastErr = null;
 
-      setTodayMeta("Sessão OK ✅ carregando seu projeto…");
-
-      showApp();
-      applyView();
-      await hydrateUserUI(session);
-
-      if (canRenderProjectsHere()) {
-        await renderSeedToFruitState(session);
+    for (const step of tries) {
+      try {
+        const { data, error } = await withTimeout(sb.auth.getSession(), step.t, `boot.getSession(${step.t})`);
+        if (error) throw error;
+        return data.session || null;
+      } catch (e) {
+        lastErr = e;
+        console.warn("[boot] getSession falhou:", e?.message || e);
+        await new Promise(r => setTimeout(r, step.wait));
       }
-    } catch (e) {
-      console.error("[boot] erro:", e);
-      showLogin();
     }
-  };
+
+    throw lastErr || new Error("Falha ao obter sessão");
+  }
+
+  try {
+    const session = await getSessionWithRetry();
+    window.__session = session;
+
+    if (!session) {
+      showLogin(""); // fica no login sem erro
+      return;
+    }
+
+    setTodayMeta("Sessão OK ✅ carregando seu projeto…");
+    showApp();
+    applyView();
+    await hydrateUserUI(session);
+
+    if (canRenderProjectsHere()) {
+      await renderSeedToFruitState(session);
+    }
+  } catch (e) {
+    console.error("[boot] erro (auth):", e);
+    // Não “assusta” o usuário com erro técnico
+    showLogin("Não consegui validar sua sessão agora. Tente atualizar a página.");
+  }
+};
+
 
 
 
