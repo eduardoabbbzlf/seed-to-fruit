@@ -2038,6 +2038,20 @@
       };
     }
 
+    if (phaseNumber === 3) {
+      return {
+        title: "Validação rápida (mundo real)",
+        questions: [
+          "Quem são as 3 pessoas reais (nome/apelido) que você vai abordar?",
+          "Qual pergunta você vai fazer primeiro para confirmar a dor sem influenciar?",
+          "O que você acredita que elas vão responder? (hipótese)",
+          "Qual é o menor teste que prova valor em 24h? (MVP feio)",
+          "Qual sinal vai indicar 'vale continuar'? (critério de sucesso)"
+        ]
+      };
+    }
+
+
     // fallback (caso você avance para novas fases depois)
     return {
       title: `Fase ${phaseNumber}`,
@@ -2094,6 +2108,10 @@
     // (se você já tem fase 2, recomendo criar esses globals também)
     __phase2RowId = null;
     __phase2Json = null;
+
+    // reset fase 3
+    __phase3RowId = null;
+    __phase3Json = null;
 
     if (phase1Msg) phase1Msg.textContent = "Carregando…";
 
@@ -2355,10 +2373,38 @@
 
       if (phase2Msg) phase2Msg.textContent = "Concluindo Fase 2…";
       await savePhase2("completed");
+      console.log("[Phase2] project_phases.update OK");
 
-      // avança projeto para fase 3 (próximo passo)
-      await sb.from("projects").update({ current_phase: 3 }).eq("id", __currentProjectId);
-      await ensurePhaseExists(__currentProjectId, 3);
+      const { data: updProj, error: eProj } = await sb
+        .from("projects")
+        .update({ current_phase: 3 })
+        .eq("id", __currentProjectId)
+        .select("id,current_phase")
+        .single();
+
+      if (eProj) {
+        console.error("[Phase2] projects.update error:", eProj);
+        throw new Error(eProj.message || "Falha ao avançar para Fase 3");
+      }
+
+      console.log("[Phase2] projects.update OK:", updProj);
+
+      const phase3 = await ensurePhaseExists(__currentProjectId, 3);
+      console.log("[Phase2] ensurePhaseExists(3) OK:", phase3?.id);
+
+      // Confirma no banco
+      const { data: check, error: eCheck } = await sb
+        .from("projects")
+        .select("current_phase")
+        .eq("id", __currentProjectId)
+        .single();
+
+      if (eCheck) throw eCheck;
+
+      if (Number(check.current_phase) !== 3) {
+        throw new Error("Banco não confirmou avanço para Fase 3.");
+      }
+
 
       // XP da conclusão da fase 2 (defina um valor fixo)
       const session = window.__session || await ensureSessionLoaded();
@@ -2460,13 +2506,199 @@
     const update = { content_json: __phase2Json };
     if (statusOverride) update.status = statusOverride;
 
-    const { error } = await sb
+    const { data, error } = await sb
       .from("project_phases")
       .update(update)
-      .eq("id", __phase2RowId);
+      .eq("id", __phase2RowId)
+      .select("id,status")
+      .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[Phase2] savePhase2 error:", error);
+      throw new Error(error.message || "Falha ao salvar Fase 2");
+    }
+
+    console.log("[Phase2] project_phases.update OK:", data);
   }
+
+
+  // Phase 3
+
+  btnSavePhase3?.addEventListener("click", async () => {
+    try {
+      btnSavePhase3.disabled = true;
+      if (phase2Msg) phase3Msg.textContent = "Salvando…";
+      await savePhase3(null);
+      if (phase3Msg) phase3Msg.textContent = "Salvo ✅";
+    } catch (e) {
+      console.error(e);
+      if (phase3Msg) phase3Msg.textContent = "Erro ao salvar.";
+    } finally {
+      btnSavePhase3.disabled = false;
+    }
+  });
+
+  btnCompletePhase3?.addEventListener("click", async () => {
+    try {
+      btnCompletePhase3.disabled = true;
+
+      const pct = updatePhase3Progress();
+      const total = (__phase3Json?.questions?.length || 5);
+      if (pct < 100) {
+        if (phase3Msg) phase3Msg.textContent = `Complete as ${total} respostas antes de concluir. (${pct}%)`;
+        return;
+      }
+
+      if (phase3Msg) phase3Msg.textContent = "Concluindo Fase 3…";
+      await savePhase3("completed");
+      console.log("[Phase3] project_phases.update OK");
+
+      const { data: updProj, error: eProj } = await sb
+        .from("projects")
+        .update({ current_phase: 3 })
+        .eq("id", __currentProjectId)
+        .select("id,current_phase")
+        .single();
+
+      if (eProj) {
+        console.error("[Phase3] projects.update error:", eProj);
+        throw new Error(eProj.message || "Falha ao avançar para Fase 4");
+      }
+
+      console.log("[Phase3] projects.update OK:", updProj);
+
+      const phase3 = await ensurePhaseExists(__currentProjectId, 3);
+      console.log("[Phase3] ensurePhaseExists(3) OK:", phase3?.id);
+
+      // Confirma no banco
+      const { data: check, error: eCheck } = await sb
+        .from("projects")
+        .select("current_phase")
+        .eq("id", __currentProjectId)
+        .single();
+
+      if (eCheck) throw eCheck;
+
+      if (Number(check.current_phase) !== 3) {
+        throw new Error("Banco não confirmou avanço para Fase 4.");
+      }
+
+
+      // XP da conclusão da fase 3 (defina um valor fixo)
+      const session = window.__session || await ensureSessionLoaded();
+      const userId = session?.user?.id;
+      if (userId) {
+        await addXpEvent({
+          userId,
+          projectId: __currentProjectId,
+          xpAmount: 80, // ajuste como quiser
+          eventType: "phase_completed",
+          source: "phase",
+          sourceId: __phase3RowId,
+          meta: { phase_number: 2 }
+        });
+      }
+
+      if (phase3Msg) phase3Msg.textContent = "Fase 3 concluída ✅ XP somado! Próximo: Fase 3.";
+      // opcional: atualizar bloco Hoje
+      if (userId && __activeProjectCache?.id === __currentProjectId) {
+        await renderTodayOnDashboard(session, __activeProjectCache);
+      }
+    } catch (e) {
+      console.error(e);
+      if (phase3Msg) phase3Msg.textContent = "Erro ao concluir fase.";
+    } finally {
+      btnCompletePhase3.disabled = false;
+    }
+  });
+
+
+  const phase3Actions = document.getElementById("phase3Actions");
+
+  function calcPhasePercent(answers, questionsCount = 5) {
+    let filled = 0;
+
+    if (Array.isArray(answers)) {
+      filled = answers.filter(v => String(v ?? "").trim().length > 0).length;
+      const total = Math.max(questionsCount, answers.length || questionsCount);
+      return Math.round((filled / total) * 100);
+    }
+
+    if (answers && typeof answers === "object") {
+      const values = Object.values(answers);
+      filled = values.filter(v => String(v ?? "").trim().length > 0).length;
+      const total = Math.max(questionsCount, values.length || questionsCount);
+      return Math.round((filled / total) * 100);
+    }
+
+    return 0;
+  }
+
+  function updatePhase3Progress() {
+    const questions = __phase3Json?.questions || [];
+    const answers = __phase3Json?.answers || [];
+    const pct = calcPhasePercent(answers, questions.length || 5);
+    if (phase3Progress) phase3Progress.textContent = `Progresso: ${pct}%`;
+    return pct;
+  }
+
+  function paintPhase3UI() {
+    // mostra blocos da fase 3
+    if (phase3Block) phase2Block.style.display = "block";
+    if (phase3QuestionsWrap) phase3QuestionsWrap.style.display = "block";
+    if (phase3Actions) phase3Actions.style.display = "flex";
+    if (phase3Msg) { phase3Msg.style.display = "block"; phase3Msg.textContent = ""; }
+
+    const q = __phase3Json?.questions || [];
+    const a = Array.isArray(__phase3Json?.answers) ? __phase3Json.answers : [];
+
+    // garante array
+    __phase3Json.answers = Array.isArray(__phase3Json.answers) ? __phase3Json.answers : [];
+
+    if (phase3QuestionsWrap) {
+      phase3QuestionsWrap.innerHTML = "";
+      q.forEach((question, idx) => {
+        const box = document.createElement("div");
+        box.className = "q";
+        box.innerHTML = `
+          <label>${escapeHtml(question)}</label>
+          <textarea data-q2="${idx}" placeholder="Responda de forma direta…"></textarea>
+        `;
+        phase3QuestionsWrap.appendChild(box);
+
+        const ta = box.querySelector("textarea");
+        ta.value = a[idx] || "";
+        ta.addEventListener("input", () => {
+          __phase3Json.answers[idx] = ta.value;
+          updatePhase3Progress();
+        });
+      });
+    }
+
+    updatePhase3Progress();
+  }
+
+  async function savePhase3(statusOverride = null) {
+    if (!__phase3RowId) throw new Error("Fase 3 não carregada.");
+
+    const update = { content_json: __phase3Json };
+    if (statusOverride) update.status = statusOverride;
+
+    const { data, error } = await sb
+      .from("project_phases")
+      .update(update)
+      .eq("id", __phase3RowId)
+      .select("id,status")
+      .single();
+
+    if (error) {
+      console.error("[Phase3] savePhase3 error:", error);
+      throw new Error(error.message || "Falha ao salvar Fase 3");
+    }
+
+    console.log("[Phase3] project_phases.update OK:", data);
+  }
+
 
 
   async function renderTodayOnDashboard(session, activeProject) {
