@@ -1197,6 +1197,92 @@ async function incrementProjectXp(projectId, userId, delta) {
     return { plan, tasks: tasks || [] };
   }
 
+  // se não tem plano, cria um, se tem plano mas não tem tasks, cria tasks
+  async function ensureTodayPlanAndTasks(projectId, phaseNumber) {
+    const day = todayISODate();
+
+    // 1) garante plan
+    let { data: plan, error: e1 } = await sb
+      .from("daily_plans")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("day_date", day)
+      .maybeSingle();
+    if (e1) throw e1;
+
+    if (!plan) {
+      const routine = {
+        wake_time: "06:30",
+        sleep_time: "23:30",
+        notes: "Plano diário gerado automaticamente (MVP)."
+      };
+
+      const { data: created, error: e2 } = await sb
+        .from("daily_plans")
+        .insert({
+          project_id: projectId,
+          day_date: day,
+          focus_title: `Foco do dia (Fase ${phaseNumber || 1})`,
+          routine_json: routine,
+          progress_percent: 0
+        })
+        .select("*")
+        .single();
+      if (e2) throw e2;
+      plan = created;
+    }
+
+    // 2) busca tasks
+    const { data: tasks, error: e3 } = await sb
+      .from("tasks")
+      .select("id, title, description, type, priority, xp_reward, is_done")
+      .eq("daily_plan_id", plan.id)
+      .order("priority", { ascending: true });
+    if (e3) throw e3;
+
+    if (tasks && tasks.length) return { plan, tasks };
+
+    // 3) cria tasks mínimas por fase (MVP sem IA)
+    const seedTasks = getSeedTasksForPhase(phaseNumber || 1, plan.id);
+
+    if (seedTasks.length) {
+      const { error: e4 } = await sb.from("tasks").insert(seedTasks);
+      if (e4) throw e4;
+    }
+
+    // 4) retorna novamente
+    const { data: tasks2, error: e5 } = await sb
+      .from("tasks")
+      .select("id, title, description, type, priority, xp_reward, is_done")
+      .eq("daily_plan_id", plan.id)
+      .order("priority", { ascending: true });
+    if (e5) throw e5;
+
+    return { plan, tasks: tasks2 || [] };
+  }
+
+  function getSeedTasksForPhase(phaseNumber, dailyPlanId) {
+    if (phaseNumber === 1) {
+      return [
+        { daily_plan_id: dailyPlanId, title: "Finalizar respostas da Fase 1", description: "Complete 100% das respostas da fase 1.", priority: 1, type: "focus", xp_reward: 25 },
+        { daily_plan_id: dailyPlanId, title: "Escrever Frase da Dor", description: "Pessoas que ____ sofrem com ____ porque ____.", priority: 2, type: "task", xp_reward: 20 },
+        { daily_plan_id: dailyPlanId, title: "Listar 3 pessoas para entrevistar", description: "Escreva nomes reais para validação.", priority: 3, type: "validation", xp_reward: 20 }
+      ];
+    }
+
+    if (phaseNumber === 2) {
+      return [
+        { daily_plan_id: dailyPlanId, title: "Finalizar respostas da Fase 2", description: "Deixe a solução clara e simples.", priority: 1, type: "focus", xp_reward: 25 },
+        { daily_plan_id: dailyPlanId, title: "Definir escopo (o que NÃO faz)", description: "Evite MVP inflado. Escreva limites.", priority: 2, type: "task", xp_reward: 20 },
+        { daily_plan_id: dailyPlanId, title: "Escrever 1 proposta de valor", description: "Uma frase: ‘Eu ajudo X a fazer Y sem Z’.", priority: 3, type: "validation", xp_reward: 20 }
+      ];
+    }
+
+    // fases futuras: vazio por enquanto
+    return [];
+  }
+
+
 
   function showProjectsView() {
     if (viewDashboard) viewDashboard.style.display = "none";
@@ -2535,12 +2621,9 @@ async function incrementProjectXp(projectId, userId, delta) {
     const xp = await fetchUserXp(userId);
     if (todayMeta) todayMeta.textContent = `XP Total: ${xp}`;
 
-    const { plan, tasks } = await fetchTodayPlanAndTasks(activeProject.id);
+    const phaseNumber = Number(activeProject.current_phase || 1);
+    const { plan, tasks } = await ensureTodayPlanAndTasks(activeProject.id, phaseNumber);
 
-    if (!plan) {
-      if (todayTasks) todayTasks.innerHTML = `<div class="muted small">Sem plano para hoje ainda.</div>`;
-      return;
-    }
 
     if (todayTasks) {
       todayTasks.innerHTML = "";
