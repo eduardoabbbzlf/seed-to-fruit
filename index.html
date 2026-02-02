@@ -1059,7 +1059,7 @@
   const viewProjects = document.getElementById("viewProjects");
   const viewProjectDetail = document.getElementById("viewProjectDetail");
   const btnGoProjects = document.getElementById("btnGoProjects");
-  const btnBackFromProjects = document.getElementById("btnBackFromProjects");
+  const btnBackProjects = document.getElementById("btnBackProjects");
   const btnBackToProjects = document.getElementById("btnBackToProjects");
   const viewProfile = document.getElementById("viewProfile");
   const btnGoProfile = document.getElementById("btnGoProfile");
@@ -1076,56 +1076,92 @@
     if (viewDashboard) viewDashboard.style.display = "block";
   }
 
-  async function addXpEvent({ userId, projectId, xpAmount, eventType, source, sourceId = null, meta = {} }) {
-    const amt = Number(xpAmount || 0);
-    if (!amt) return;
+  async function grantXpOnce({
+    userId,
+    projectId,
+    eventType,
+    sourceId,
+    xpAmount
+  }) {
+    // 1. Verifica se evento já existe
+    const { data: existing } = await sb
+      .from("xp_events")
+      .select("id")
+      .eq("event_type", eventType)
+      .eq("source_id", sourceId)
+      .limit(1);
 
-    // 1) registra evento (histórico)
-    const { error: e0 } = await sb.from("xp_events").insert({
+    if (existing?.length) return { skipped: true };
+
+    // 2. Cria evento
+    await sb.from("xp_events").insert({
       user_id: userId,
-      project_id: projectId || null,
-      xp_amount: amt,
+      project_id: projectId,
       event_type: eventType,
-      source,
       source_id: sourceId,
-      meta
+      xp_amount: xpAmount
     });
-    if (e0) throw e0;
 
-    // 2) mantém total rápido (você já usa user_xp e project_xp)
-    await ensureUserXpRow(userId);
-    if (projectId) await ensureProjectXpRow(projectId, userId);
+    // 3. Atualiza acumulados
+    await incrementUserXp(userId, xpAmount);
+    await incrementProjectXp(projectId, userId, xpAmount);
 
-    // soma em user_xp
-    const { data: ux, error: e1 } = await sb
-      .from("user_xp")
-      .select("total_xp")
-      .eq("user_id", userId)
-      .single();
-    if (e1) throw e1;
-
-    const { error: e2 } = await sb
-      .from("user_xp")
-      .update({ total_xp: (ux.total_xp || 0) + amt, updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
-    if (e2) throw e2;
-
-    // soma em project_xp
-    if (projectId) {
-      const { data: px, error: e3 } = await sb
-        .from("project_xp")
-        .select("total_xp")
-        .eq("project_id", projectId)
-        .single();
-      if (e3) throw e3;
-
-      const { error: e4 } = await sb
-        .from("project_xp")
-        .update({ total_xp: (px.total_xp || 0) + amt, updated_at: new Date().toISOString() })
-        .eq("project_id", projectId);
-      if (e4) throw e4;
-    }
+    return { granted: true };
   }
+
+
+  async function incrementUserXp(userId, delta) {
+  // garante linha
+  await sb.from("user_xp").upsert(
+    { user_id: userId, total_xp: 0 },
+    { onConflict: "user_id" }
+  );
+
+  // lê atual
+  const { data: row, error: e1 } = await sb
+    .from("user_xp")
+    .select("total_xp")
+    .eq("user_id", userId)
+    .single();
+  if (e1) throw e1;
+
+  // atualiza
+  const { error: e2 } = await sb
+    .from("user_xp")
+    .update({
+      total_xp: Number(row.total_xp || 0) + Number(delta || 0),
+      updated_at: new Date().toISOString()
+    })
+    .eq("user_id", userId);
+  if (e2) throw e2;
+}
+
+async function incrementProjectXp(projectId, userId, delta) {
+  // garante linha (agora noConflict correto: project_id,user_id)
+  await sb.from("project_xp").upsert(
+    { project_id: projectId, user_id: userId, total_xp: 0 },
+    { onConflict: "project_id,user_id" }
+  );
+
+  const { data: row, error: e1 } = await sb
+    .from("project_xp")
+    .select("total_xp")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .single();
+  if (e1) throw e1;
+
+  const { error: e2 } = await sb
+    .from("project_xp")
+    .update({
+      total_xp: Number(row.total_xp || 0) + Number(delta || 0),
+      updated_at: new Date().toISOString()
+    })
+    .eq("project_id", projectId)
+    .eq("user_id", userId);
+  if (e2) throw e2;
+}
+
 
 
   async function fetchUserXp(userId) {
@@ -1237,9 +1273,10 @@
     await loadProjectsList(session);
   });
 
-  btnBackFromProjects?.addEventListener("click", () => {
+  btnBackProjects?.addEventListener("click", () => {
     showDashboardView();
   });
+
 
   btnBackToProjects?.addEventListener("click", async () => {
     const session = window.__session || await ensureSessionLoaded();
@@ -1395,7 +1432,7 @@
   async function ensureProjectXpRow(projectId, userId) {
     const { data, error } = await sb
       .from("project_xp")
-      .upsert({ project_id: projectId, user_id: userId, total_xp: 0 }, { onConflict: "project_id" })
+      .upsert({ project_id: projectId, user_id: userId, total_xp: 0 }, { onConflict: "project_id,user_id" })
       .select("*")
       .single();
 
@@ -1408,60 +1445,36 @@
   * Segurança: só soma XP se a task estava is_done=false.
   */
   async function completeTaskAndGiveXp({ taskId, userId, projectId }) {
-    // 1) buscar estado atual
-    const { data: t0, error: e0 } = await sb
-      .from("tasks")
-      .select("id, is_done, xp_reward")
-      .eq("id", taskId)
-      .single();
-    if (e0) throw e0;
+  // 1) buscar estado atual
+  const { data: t0, error: e0 } = await sb
+    .from("tasks")
+    .select("id, is_done, xp_reward")
+    .eq("id", taskId)
+    .single();
+  if (e0) throw e0;
 
-    if (t0.is_done) {
-      return { alreadyDone: true, gained: 0 };
-    }
+  if (t0.is_done) return { alreadyDone: true, gained: 0 };
 
-    const gained = Number(t0.xp_reward || 0);
+  const gained = Number(t0.xp_reward || 0);
 
-    // 2) marcar concluída
-    const { error: e1 } = await sb
-      .from("tasks")
-      .update({ is_done: true, completed_at: new Date().toISOString() })
-      .eq("id", taskId);
-    if (e1) throw e1;
+  // 2) marcar concluída
+  const { error: e1 } = await sb
+    .from("tasks")
+    .update({ is_done: true, completed_at: new Date().toISOString() })
+    .eq("id", taskId);
+  if (e1) throw e1;
 
-    // 3) garantir rows de XP
-    await ensureUserXpRow(userId);
-    await ensureProjectXpRow(projectId, userId);
+  // 3) XP via evento (idempotente)
+  await grantXpOnce({
+    userId,
+    projectId,
+    eventType: "TASK_COMPLETED",
+    sourceId: taskId,
+    xpAmount: gained
+  });
 
-    // 4) somar xp (fetch + update simples, confiável no client)
-    const { data: ux, error: e2 } = await sb
-      .from("user_xp")
-      .select("total_xp")
-      .eq("user_id", userId)
-      .single();
-    if (e2) throw e2;
-
-    const { error: e3 } = await sb
-      .from("user_xp")
-      .update({ total_xp: (ux.total_xp || 0) + gained, updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
-    if (e3) throw e3;
-
-    const { data: px, error: e4 } = await sb
-      .from("project_xp")
-      .select("total_xp")
-      .eq("project_id", projectId)
-      .single();
-    if (e4) throw e4;
-
-    const { error: e5 } = await sb
-      .from("project_xp")
-      .update({ total_xp: (px.total_xp || 0) + gained, updated_at: new Date().toISOString() })
-      .eq("project_id", projectId);
-    if (e5) throw e5;
-
-    return { alreadyDone: false, gained };
-  }
+  return { alreadyDone: false, gained };
+}
 
 
   // =========================
@@ -1758,14 +1771,6 @@
     return proj;
   }
 
-  function withTimeout(promise, ms, label) {
-  let t;
-  const timeout = new Promise((_, reject) => {
-    t = setTimeout(() => reject(new Error(`Timeout em ${label} (${ms}ms)`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
-}
-
   btnCreateIdea?.addEventListener("click", async () => {
     try {
       btnCreateIdea.disabled = true;
@@ -2029,11 +2034,11 @@
       return {
         title: "Solução em linguagem simples",
         questions: [
-          "Se eu estivesse ao lado dessa pessoa, o que eu faria por ela agora?",
-          "Qual a primeira ajuda que já traria valor?",
-          "O que pode ser entregue feio, mas útil?",
-          "O que pode esperar para depois?",
-          "O que definitivamente NÃO é necessário agora?"
+          "Qual é a solução principal para essa dor?",
+          "Quem exatamente se beneficia dessa solução?",
+          "Por que essa solução é melhor que as alternativas?",
+          "Como essa solução será entregue (produto/serviço)?",
+          "O que essa solução NÃO faz (escopo claro)?"
         ]
       };
     }
@@ -2409,15 +2414,13 @@
       // XP da conclusão da fase 2 (defina um valor fixo)
       const session = window.__session || await ensureSessionLoaded();
       const userId = session?.user?.id;
-      if (userId) {
-        await addXpEvent({
+        if (userId) {
+          await grantXpOnce({
           userId,
           projectId: __currentProjectId,
-          xpAmount: 80, // ajuste como quiser
-          eventType: "phase_completed",
-          source: "phase",
+          eventType: "PHASE_COMPLETED",
           sourceId: __phase2RowId,
-          meta: { phase_number: 2 }
+          xpAmount: 80
         });
       }
 
@@ -2520,185 +2523,6 @@
 
     console.log("[Phase2] project_phases.update OK:", data);
   }
-
-
-  // Phase 3
-
-  btnSavePhase3?.addEventListener("click", async () => {
-    try {
-      btnSavePhase3.disabled = true;
-      if (phase2Msg) phase3Msg.textContent = "Salvando…";
-      await savePhase3(null);
-      if (phase3Msg) phase3Msg.textContent = "Salvo ✅";
-    } catch (e) {
-      console.error(e);
-      if (phase3Msg) phase3Msg.textContent = "Erro ao salvar.";
-    } finally {
-      btnSavePhase3.disabled = false;
-    }
-  });
-
-  btnCompletePhase3?.addEventListener("click", async () => {
-    try {
-      btnCompletePhase3.disabled = true;
-
-      const pct = updatePhase3Progress();
-      const total = (__phase3Json?.questions?.length || 5);
-      if (pct < 100) {
-        if (phase3Msg) phase3Msg.textContent = `Complete as ${total} respostas antes de concluir. (${pct}%)`;
-        return;
-      }
-
-      if (phase3Msg) phase3Msg.textContent = "Concluindo Fase 3…";
-      await savePhase3("completed");
-      console.log("[Phase3] project_phases.update OK");
-
-      const { data: updProj, error: eProj } = await sb
-        .from("projects")
-        .update({ current_phase: 3 })
-        .eq("id", __currentProjectId)
-        .select("id,current_phase")
-        .single();
-
-      if (eProj) {
-        console.error("[Phase3] projects.update error:", eProj);
-        throw new Error(eProj.message || "Falha ao avançar para Fase 4");
-      }
-
-      console.log("[Phase3] projects.update OK:", updProj);
-
-      const phase3 = await ensurePhaseExists(__currentProjectId, 3);
-      console.log("[Phase3] ensurePhaseExists(3) OK:", phase3?.id);
-
-      // Confirma no banco
-      const { data: check, error: eCheck } = await sb
-        .from("projects")
-        .select("current_phase")
-        .eq("id", __currentProjectId)
-        .single();
-
-      if (eCheck) throw eCheck;
-
-      if (Number(check.current_phase) !== 3) {
-        throw new Error("Banco não confirmou avanço para Fase 4.");
-      }
-
-
-      // XP da conclusão da fase 3 (defina um valor fixo)
-      const session = window.__session || await ensureSessionLoaded();
-      const userId = session?.user?.id;
-      if (userId) {
-        await addXpEvent({
-          userId,
-          projectId: __currentProjectId,
-          xpAmount: 80, // ajuste como quiser
-          eventType: "phase_completed",
-          source: "phase",
-          sourceId: __phase3RowId,
-          meta: { phase_number: 2 }
-        });
-      }
-
-      if (phase3Msg) phase3Msg.textContent = "Fase 3 concluída ✅ XP somado! Próximo: Fase 3.";
-      // opcional: atualizar bloco Hoje
-      if (userId && __activeProjectCache?.id === __currentProjectId) {
-        await renderTodayOnDashboard(session, __activeProjectCache);
-      }
-    } catch (e) {
-      console.error(e);
-      if (phase3Msg) phase3Msg.textContent = "Erro ao concluir fase.";
-    } finally {
-      btnCompletePhase3.disabled = false;
-    }
-  });
-
-
-  const phase3Actions = document.getElementById("phase3Actions");
-
-  function calcPhasePercent(answers, questionsCount = 5) {
-    let filled = 0;
-
-    if (Array.isArray(answers)) {
-      filled = answers.filter(v => String(v ?? "").trim().length > 0).length;
-      const total = Math.max(questionsCount, answers.length || questionsCount);
-      return Math.round((filled / total) * 100);
-    }
-
-    if (answers && typeof answers === "object") {
-      const values = Object.values(answers);
-      filled = values.filter(v => String(v ?? "").trim().length > 0).length;
-      const total = Math.max(questionsCount, values.length || questionsCount);
-      return Math.round((filled / total) * 100);
-    }
-
-    return 0;
-  }
-
-  function updatePhase3Progress() {
-    const questions = __phase3Json?.questions || [];
-    const answers = __phase3Json?.answers || [];
-    const pct = calcPhasePercent(answers, questions.length || 5);
-    if (phase3Progress) phase3Progress.textContent = `Progresso: ${pct}%`;
-    return pct;
-  }
-
-  function paintPhase3UI() {
-    // mostra blocos da fase 3
-    if (phase3Block) phase2Block.style.display = "block";
-    if (phase3QuestionsWrap) phase3QuestionsWrap.style.display = "block";
-    if (phase3Actions) phase3Actions.style.display = "flex";
-    if (phase3Msg) { phase3Msg.style.display = "block"; phase3Msg.textContent = ""; }
-
-    const q = __phase3Json?.questions || [];
-    const a = Array.isArray(__phase3Json?.answers) ? __phase3Json.answers : [];
-
-    // garante array
-    __phase3Json.answers = Array.isArray(__phase3Json.answers) ? __phase3Json.answers : [];
-
-    if (phase3QuestionsWrap) {
-      phase3QuestionsWrap.innerHTML = "";
-      q.forEach((question, idx) => {
-        const box = document.createElement("div");
-        box.className = "q";
-        box.innerHTML = `
-          <label>${escapeHtml(question)}</label>
-          <textarea data-q2="${idx}" placeholder="Responda de forma direta…"></textarea>
-        `;
-        phase3QuestionsWrap.appendChild(box);
-
-        const ta = box.querySelector("textarea");
-        ta.value = a[idx] || "";
-        ta.addEventListener("input", () => {
-          __phase3Json.answers[idx] = ta.value;
-          updatePhase3Progress();
-        });
-      });
-    }
-
-    updatePhase3Progress();
-  }
-
-  async function savePhase3(statusOverride = null) {
-    if (!__phase3RowId) throw new Error("Fase 3 não carregada.");
-
-    const update = { content_json: __phase3Json };
-    if (statusOverride) update.status = statusOverride;
-
-    const { data, error } = await sb
-      .from("project_phases")
-      .update(update)
-      .eq("id", __phase3RowId)
-      .select("id,status")
-      .single();
-
-    if (error) {
-      console.error("[Phase3] savePhase3 error:", error);
-      throw new Error(error.message || "Falha ao salvar Fase 3");
-    }
-
-    console.log("[Phase3] project_phases.update OK:", data);
-  }
-
 
 
   async function renderTodayOnDashboard(session, activeProject) {
