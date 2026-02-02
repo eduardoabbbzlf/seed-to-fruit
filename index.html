@@ -1681,6 +1681,7 @@ async function incrementProjectXp(projectId, userId, delta) {
         `Logado como: ${session.user.email} • Projeto: ${active.title}`;
     }
     setTodayMeta(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
+    await renderTodayOnDashboard(session, active);
   }
 
 
