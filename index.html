@@ -842,20 +842,6 @@ window.addEventListener("unhandledrejection", (e) => {
 
     return showLogin("Não foi possível entrar. Verifique seu email e senha e tente novamente.");
   }
-
-  if (error) {
-    console.error("Login error:", error);
-
-    // mensagens comuns do Supabase
-    const msg = (error.message || "").toLowerCase();
-
-    if (msg.includes("email not confirmed")) {
-      return showLogin("Seu email ainda não foi confirmado. Abra o email que o Supabase enviou e confirme o cadastro.");
-    }
-
-    return showLogin(error.message || "Falha no login. Verifique email/senha e tente novamente.");
-  }
-
   // se logou, segue normal
 }
 
@@ -1557,54 +1543,36 @@ async function incrementProjectXp(projectId, userId, delta) {
   * Segurança: só soma XP se a task estava is_done=false.
   */
   async function completeTaskAndGiveXp({ taskId, userId, projectId }) {
-  // 1) buscar estado atual
-  const { data: t0, error: e0 } = await sb
-    .from("tasks")
-    .select("id, is_done, xp_reward")
-    .eq("id", taskId)
-    .single();
-  if (e0) throw e0;
+    // 1) buscar estado atual
+    const { data: t0, error: e0 } = await sb
+      .from("tasks")
+      .select("id, is_done, xp_reward")
+      .eq("id", taskId)
+      .single();
+    if (e0) throw e0;
 
-  if (t0.is_done) return { alreadyDone: true, gained: 0 };
+    if (t0.is_done) return { alreadyDone: true, gained: 0 };
 
-  const gained = Number(t0.xp_reward || 0);
+    const gained = Number(t0.xp_reward || 0);
 
-  // 2) marcar concluída
-  const { error: e1 } = await sb
-    .from("tasks")
-    .update({ is_done: true, completed_at: new Date().toISOString() })
-    .eq("id", taskId);
-  if (e1) throw e1;
+    // 2) marcar concluída
+    const { error: e1 } = await sb
+      .from("tasks")
+      .update({ is_done: true, completed_at: new Date().toISOString() })
+      .eq("id", taskId);
+    if (e1) throw e1;
 
-  // 3) XP via evento (idempotente)
-  await grantXpOnce({
-    userId,
-    projectId,
-    eventType: "TASK_COMPLETED",
-    sourceId: taskId,
-    xpAmount: gained
-  });
+    // 3) XP via evento (idempotente)
+    await grantXpOnce({
+      userId,
+      projectId,
+      eventType: "TASK_COMPLETED",
+      sourceId: taskId,
+      xpAmount: gained
+    });
 
-  // 3) garantir rows (opcional se RPC já cria, mas pode manter)
-  await ensureUserXpRow(userId);
-  await ensureProjectXpRow(projectId, userId);
-
-  // 4) incrementos atômicos (sem race condition)
-  const { data: newUserTotal, error: eUx } = await sb.rpc("increment_user_xp", {
-    p_user_id: userId,
-    p_delta: gained
-  });
-  if (eUx) throw eUx;
-
-  const { data: newProjTotal, error: ePx } = await sb.rpc("increment_project_xp", {
-    p_project_id: projectId,
-    p_user_id: userId,
-    p_delta: gained
-  });
-  if (ePx) throw ePx;
-
-  return { alreadyDone: false, gained, newUserTotal, newProjTotal };
-}
+    return { alreadyDone: false, gained };
+  }
 
 
   // =========================
@@ -2671,7 +2639,6 @@ async function incrementProjectXp(projectId, userId, delta) {
 
   async function renderTodayOnDashboard(session, activeProject) {
     const userId = session.user.id;
-
     const todayTasks = document.getElementById("todayTasks");
 
     const xp = await fetchUserXp(userId);
@@ -2680,12 +2647,14 @@ async function incrementProjectXp(projectId, userId, delta) {
     const phaseNumber = Number(activeProject.current_phase || 1);
     const { plan, tasks } = await ensureTodayPlanAndTasks(activeProject.id, phaseNumber);
 
+    if (!todayTasks) return;
 
-    if (todayTasks) {
     todayTasks.innerHTML = "";
+
     tasks.forEach(t => {
       const card = document.createElement("div");
       card.className = "q";
+
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
           <div>
@@ -2700,34 +2669,43 @@ async function incrementProjectXp(projectId, userId, delta) {
       if (t.is_done) card.style.opacity = "0.65";
 
       const btn = card.querySelector("button");
-      if (!t.is_done) {
-        btn.addEventListener("click", async () => {
-          btn.textContent = "Concluindo...";
-          btn.disabled = true;
+      btn.disabled = !!t.is_done;
 
-          try {
-            await completeTaskAndGiveXp({
-              taskId: t.id,
-              userId,
-              projectId: activeProject.id
-            });
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const oldText = btn.textContent;
+        btn.textContent = "Concluindo...";
 
-            await renderSeedToFruitState(session);
-            await renderTodayOnDashboard(session, activeProject);
-          } catch (e) {
-            console.error(e);
-            alert("Falha ao concluir tarefa. Veja o console.");
-            btn.textContent = "Concluir";
-            btn.disabled = false;
-          }
-        });
-      }
+        try {
+          await completeTaskAndGiveXp({
+            taskId: t.id,
+            userId,
+            projectId: activeProject.id
+          });
+
+          // UI instantânea
+          t.is_done = true;
+          card.style.opacity = "0.65";
+          btn.textContent = "Concluída ✅";
+
+          // Atualiza XP
+          const xp2 = await fetchUserXp(userId);
+          setTodayXpLine(`XP Total: ${xp2}`);
+
+        } catch (e) {
+          console.error(e);
+          alert("Falha ao concluir tarefa. Veja o console.");
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
+      });
 
       todayTasks.appendChild(card);
     });
+
+    console.log("[TODAY] rendered tasks:", tasks?.length || 0);
   }
-  console.log("[TODAY] todayTasks exists?", !!document.getElementById("todayTasks"));
-}
+
 
 
 
