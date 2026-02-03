@@ -1460,7 +1460,7 @@ async function incrementProjectXp(projectId, userId, delta) {
       return;
     }
 
-    setTodayMeta("Sessão OK ✅ carregando seu projeto…");
+    setTodayProjectLine("Sessão OK ✅ carregando seu projeto…");
     showApp();
     applyView();
     await hydrateUserUI(session);
@@ -1491,7 +1491,7 @@ async function incrementProjectXp(projectId, userId, delta) {
     showDashboardView();
     await hydrateUserUI(session);
 
-    setTodayMeta("Sessão OK ✅ atualizando…");
+    setTodayProjectLine("Sessão OK ✅ atualizando…");
 
 
     if (!session) return showLogin();
