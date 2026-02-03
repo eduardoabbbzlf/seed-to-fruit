@@ -1075,38 +1075,32 @@ window.addEventListener("unhandledrejection", (e) => {
     if (viewDashboard) viewDashboard.style.display = "block";
   }
 
-  async function grantXpOnce({
-    userId,
-    projectId,
-    eventType,
-    sourceId,
-    xpAmount
-  }) {
-    // 1. Verifica se evento já existe
-    const { data: existing } = await sb
-      .from("xp_events")
-      .select("id")
-      .eq("event_type", eventType)
-      .eq("source_id", sourceId)
-      .limit(1);
+  async function grantXpOnce({ userId, projectId, eventType, sourceId, xpAmount }) {
+  // 1) já existe?
+  const { data: existing, error: e0 } = await sb
+    .from("xp_events")
+    .select("id")
+    .eq("event_type", eventType)
+    .eq("source_id", sourceId)
+    .limit(1);
 
-    if (existing?.length) return { skipped: true };
+  if (e0) throw e0;
+  if (existing?.length) return { skipped: true };
 
-    // 2. Cria evento
-    await sb.from("xp_events").insert({
-      user_id: userId,
-      project_id: projectId,
-      event_type: eventType,
-      source_id: sourceId,
-      xp_amount: xpAmount
-    });
+  // 2) cria evento
+  const { error: e1 } = await sb.from("xp_events").insert({
+    user_id: userId,
+    project_id: projectId,
+    event_type: eventType,
+    source_id: sourceId,
+    xp_amount: xpAmount
+  });
 
-    // 3. Atualiza acumulados
-    await incrementUserXp(userId, xpAmount);
-    await incrementProjectXp(projectId, userId, xpAmount);
+  if (e1) throw e1;
 
-    return { granted: true };
-  }
+  return { granted: true };
+}
+
 
 
   async function incrementUserXp(userId, delta) {
@@ -1543,7 +1537,6 @@ async function incrementProjectXp(projectId, userId, delta) {
   * Segurança: só soma XP se a task estava is_done=false.
   */
   async function completeTaskAndGiveXp({ taskId, userId, projectId }) {
-    // 1) buscar estado atual
     const { data: t0, error: e0 } = await sb
       .from("tasks")
       .select("id, is_done, xp_reward")
@@ -1555,15 +1548,15 @@ async function incrementProjectXp(projectId, userId, delta) {
 
     const gained = Number(t0.xp_reward || 0);
 
-    // 2) marcar concluída
+    // marca task concluída
     const { error: e1 } = await sb
       .from("tasks")
       .update({ is_done: true, completed_at: new Date().toISOString() })
       .eq("id", taskId);
     if (e1) throw e1;
 
-    // 3) XP via evento (idempotente)
-    await grantXpOnce({
+    // registra evento idempotente
+    const ev = await grantXpOnce({
       userId,
       projectId,
       eventType: "TASK_COMPLETED",
@@ -1571,8 +1564,28 @@ async function incrementProjectXp(projectId, userId, delta) {
       xpAmount: gained
     });
 
-    return { alreadyDone: false, gained };
+    // ✅ só soma se evento foi criado agora
+    if (ev?.granted) {
+      const { data: newUserTotal, error: eUx } = await sb.rpc("increment_user_xp", {
+        p_user_id: userId,
+        p_delta: gained
+      });
+      if (eUx) throw eUx;
+
+      const { data: newProjTotal, error: ePx } = await sb.rpc("increment_project_xp", {
+        p_project_id: projectId,
+        p_user_id: userId,
+        p_delta: gained
+      });
+      if (ePx) throw ePx;
+
+      return { alreadyDone: false, gained, newUserTotal, newProjTotal };
+    }
+
+    // se já existia evento, não soma de novo
+    return { alreadyDone: false, gained: 0, skipped: true };
   }
+
 
 
   // =========================
