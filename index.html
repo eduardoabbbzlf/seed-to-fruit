@@ -1585,7 +1585,25 @@ async function incrementProjectXp(projectId, userId, delta) {
     xpAmount: gained
   });
 
-  return { alreadyDone: false, gained };
+  // 3) garantir rows (opcional se RPC já cria, mas pode manter)
+  await ensureUserXpRow(userId);
+  await ensureProjectXpRow(projectId, userId);
+
+  // 4) incrementos atômicos (sem race condition)
+  const { data: newUserTotal, error: eUx } = await sb.rpc("increment_user_xp", {
+    p_user_id: userId,
+    p_delta: gained
+  });
+  if (eUx) throw eUx;
+
+  const { data: newProjTotal, error: ePx } = await sb.rpc("increment_project_xp", {
+    p_project_id: projectId,
+    p_user_id: userId,
+    p_delta: gained
+  });
+  if (ePx) throw ePx;
+
+  return { alreadyDone: false, gained, newUserTotal, newProjTotal };
 }
 
 
@@ -1794,6 +1812,15 @@ async function incrementProjectXp(projectId, userId, delta) {
     }
     setTodayProjectLine(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
     await renderTodayOnDashboard(session, active);
+
+
+        console.log("[TODAY] chamando renderTodayOnDashboard", active?.id);
+    try {
+      await renderTodayOnDashboard(session, active);
+    } catch (e) {
+      console.error("[TODAY] erro renderTodayOnDashboard:", e);
+    }
+
   }
 
 
@@ -2645,7 +2672,6 @@ async function incrementProjectXp(projectId, userId, delta) {
   async function renderTodayOnDashboard(session, activeProject) {
     const userId = session.user.id;
 
-    const todayMeta = document.getElementById("todayMeta");
     const todayTasks = document.getElementById("todayTasks");
 
     const xp = await fetchUserXp(userId);
@@ -2700,7 +2726,7 @@ async function incrementProjectXp(projectId, userId, delta) {
       todayTasks.appendChild(card);
     });
   }
-
+  console.log("[TODAY] todayTasks exists?", !!document.getElementById("todayTasks"));
 }
 
 
