@@ -355,7 +355,8 @@
     <div class="sep"></div>
     <div id="todayBlock" class="q">
       <label>Hoje</label>
-      <div id="todayMeta" class="muted small">Carregando…</div>
+      <div id="todayProjectLine" class="muted small">Carregando projeto…</div>
+      <div id="todayXpLine" class="muted small" style="margin-top:4px;">XP Total: —</div>
       <div id="todayTasks" style="margin-top:10px; display:grid; gap:10px;"></div>
     </div>
 
@@ -1165,14 +1166,20 @@ async function incrementProjectXp(projectId, userId, delta) {
 
 
   async function fetchUserXp(userId) {
-    const { data } = await sb
+    const { data, error } = await sb
       .from("user_xp")
       .select("total_xp")
       .eq("user_id", userId)
       .maybeSingle();
 
-    return data?.total_xp || 0;
+    if (error) {
+      console.error("[XP] fetchUserXp error:", error);
+      return 0;
+    }
+
+    return Number(data?.total_xp || 0);
   }
+
 
   async function fetchTodayPlanAndTasks(projectId) {
     const day = todayISODate();
@@ -1339,16 +1346,23 @@ async function incrementProjectXp(projectId, userId, delta) {
     } catch (e) {
       console.error("[hydrateUserUI] erro:", e);
       }
-      setTodayMeta("Usuário carregado ✅ buscando projeto…");
+      setTodayProjectLine("Usuário carregado ✅ buscando projeto…");
   }
 
 
 
-  function setTodayMeta(text) {
-    const el = document.getElementById("todayMeta");
+  function setTodayProjectLine(text) {
+    const el = document.getElementById("todayProjectLine");
     if (!el) return;
     el.textContent = text;
   }
+
+  function setTodayXpLine(text) {
+    const el = document.getElementById("todayXpLine");
+    if (!el) return;
+    el.textContent = text;
+  }
+
 
   
 
@@ -1708,9 +1722,9 @@ async function incrementProjectXp(projectId, userId, delta) {
 
     // 0) Sempre atualiza o "Hoje" com algo imediato (sem depender do banco)
     if (__activeProjectCache?.title) {
-      setTodayMeta(`Projeto ativo: ${__activeProjectCache.title} (cache)`);
+      setTodayProjectLine(`Projeto ativo: ${__activeProjectCache.title} (cache)`);
     } else {
-      setTodayMeta("Sessão OK ✅ buscando projeto…");
+      setTodayProjectLine("Sessão OK ✅ buscando projeto…");
     }
 
     // 1) Pinta rápido com cache no topo do dashboard
@@ -1730,7 +1744,7 @@ async function incrementProjectXp(projectId, userId, delta) {
 
     if (isProjectFetchPaused()) {
       console.log("[SeedToFruit] fetch pausado, mantendo cache");
-      setTodayMeta(__activeProjectCache?.title
+      setTodayProjectLine(__activeProjectCache?.title
         ? `Projeto ativo: ${__activeProjectCache.title} (mantido)`
         : "Aguardando estabilizar sessão…"
       );
@@ -1743,7 +1757,7 @@ async function incrementProjectXp(projectId, userId, delta) {
       active = await getActiveProject(userId);
     } catch (e) {
       console.error("[SeedToFruit] erro ao buscar projeto (não transitório):", e);
-      setTodayMeta("Erro ao carregar projeto. Tente atualizar a página.");
+      setTodayProjectLine("Erro ao carregar projeto. Tente atualizar a página.");
       return;
     }
 
@@ -1753,7 +1767,7 @@ async function incrementProjectXp(projectId, userId, delta) {
     if (!active) {
       if (seedEmptyState) seedEmptyState.style.display = "block";
       if (dashUserLine) dashUserLine.textContent = `Logado como: ${session.user.email}`;
-      setTodayMeta("Sem projeto ativo. Clique em “Adicionar ideia”.");
+      setTodayProjectLine("Sem projeto ativo. Clique em “Adicionar ideia”.");
       return;
     }
 
@@ -1766,7 +1780,7 @@ async function incrementProjectXp(projectId, userId, delta) {
       dashUserLine.textContent =
         `Logado como: ${session.user.email} • Projeto: ${active.title}`;
     }
-    setTodayMeta(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
+    setTodayProjectLine(`Projeto ativo: ${active.title} • Fase ${active.current_phase}`);
     await renderTodayOnDashboard(session, active);
   }
 
@@ -2000,8 +2014,12 @@ async function incrementProjectXp(projectId, userId, delta) {
     setTimeout(() => {
       const s2 = window.__session;
       if (!s2?.user?.id) return;
+
       renderSeedToFruitState(s2, { allowFetch: true });
-    }, 7000); // ✅ 7s é o "definitivo": evita lock/abort
+
+      const p = __activeProjectCache;
+      if (p?.id) renderTodayOnDashboard(s2, p);
+    }, 7000);
   });
 
 
@@ -2619,7 +2637,7 @@ async function incrementProjectXp(projectId, userId, delta) {
     const todayTasks = document.getElementById("todayTasks");
 
     const xp = await fetchUserXp(userId);
-    if (todayMeta) todayMeta.textContent = `XP Total: ${xp}`;
+    setTodayXpLine(`XP Total: ${xp}`);
 
     const phaseNumber = Number(activeProject.current_phase || 1);
     const { plan, tasks } = await ensureTodayPlanAndTasks(activeProject.id, phaseNumber);
@@ -2640,6 +2658,10 @@ async function incrementProjectXp(projectId, userId, delta) {
             <button class="btn primary" ${t.is_done ? "disabled" : ""}>Concluir</button>
           </div>
         `;
+
+        if (t.is_done) {
+          card.style.opacity = "0.65";
+        }
 
         const btn = card.querySelector("button");
         btn.addEventListener("click", async () => {
