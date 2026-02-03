@@ -522,6 +522,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+console.log("[BOOT] script iniciou");
+
+window.addEventListener("error", (e) => {
+  console.error("[window.error]", e.message, "at", e.filename + ":" + e.lineno);
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[unhandledrejection]", e.reason);
+});
+
+
+
   let __pauseProjectFetchUntil = 0;
 
   function pauseProjectFetch(ms, why) {
