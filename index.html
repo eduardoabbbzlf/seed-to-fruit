@@ -1093,7 +1093,8 @@ window.addEventListener("unhandledrejection", (e) => {
     project_id: projectId,
     event_type: eventType,
     source_id: sourceId,
-    xp_amount: xpAmount
+    xp_amount: xpAmount,
+    source: "app" // ✅ obrigatório (coluna NOT NULL)
   });
 
   if (e1) throw e1;
@@ -1561,7 +1562,8 @@ async function incrementProjectXp(projectId, userId, delta) {
       projectId,
       eventType: "TASK_COMPLETED",
       sourceId: taskId,
-      xpAmount: gained
+      xpAmount: gained,
+      source: "task"
     });
 
     // ✅ só soma se evento foi criado agora
