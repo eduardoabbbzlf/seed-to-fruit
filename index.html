@@ -1570,14 +1570,14 @@ async function incrementProjectXp(projectId, userId, delta) {
     if (ev?.granted) {
       const { data: newUserTotal, error: eUx } = await sb.rpc("increment_user_xp", {
         p_user_id: userId,
-        p_delta: gained
+        p_amount: gained
       });
       if (eUx) throw eUx;
 
       const { data: newProjTotal, error: ePx } = await sb.rpc("increment_project_xp", {
         p_project_id: projectId,
         p_user_id: userId,
-        p_delta: gained
+        p_amount: gained
       });
       if (ePx) throw ePx;
 
