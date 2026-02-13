@@ -1245,10 +1245,11 @@ async function incrementProjectXp(projectId, userId, delta) {
     // 3) cria tasks mínimas por fase (MVP sem IA)
     const seedTasks = getSeedTasksForPhase(phaseNumber || 1, plan.id);
 
-    if (seedTasks.length) {
-      const { error: e4 } = await sb.from("tasks").insert(seedTasks);
-      if (e4) throw e4;
-    }
+    await sb.from("tasks").upsert(seedTasks, {
+      onConflict: "daily_plan_id,type,title",
+      ignoreDuplicates: true
+    });
+
 
     // 4) retorna novamente
     const { data: tasks2, error: e5 } = await sb
