@@ -1589,6 +1589,47 @@ async function incrementProjectXp(projectId, userId, delta) {
     return { alreadyDone: false, gained: 0, skipped: true };
   }
 
+  async function completePhase2Flow({ projectId, userId }) {
+    // 1) pega a fase 2 (id para usar como sourceId no xp_events)
+    const { data: phase2, error: e0 } = await sb
+      .from("project_phases")
+      .select("id,status")
+      .eq("project_id", projectId)
+      .eq("phase_number", 2)
+      .single();
+    if (e0) throw e0;
+
+    // 2) marca fase 2 como concluída (se já estiver, não quebra)
+    if (phase2.status !== "completed") {
+      const { error: e1 } = await sb
+        .from("project_phases")
+        .update({ status: "completed" })
+        .eq("id", phase2.id);
+      if (e1) throw e1;
+    }
+
+    // 3) avança projeto para fase 3
+    const { error: e2 } = await sb
+      .from("projects")
+      .update({ current_phase: 3 })
+      .eq("id", projectId);
+    if (e2) throw e2;
+
+    // 4) garante que fase 3 existe
+    await ensurePhaseExists(projectId, 3);
+
+    // 5) dá XP 1x (idempotente)
+    await grantXpOnce({
+      userId,
+      projectId,
+      eventType: "PHASE_COMPLETED",
+      sourceId: phase2.id,
+      xpAmount: 100,       // ajuste como quiser
+      source: "phase"      // IMPORTANTE: pq seu xp_events exige source NOT NULL
+    });
+  }
+
+
 
 
   // =========================
@@ -2505,65 +2546,35 @@ async function incrementProjectXp(projectId, userId, delta) {
       }
 
       if (phase2Msg) phase2Msg.textContent = "Concluindo Fase 2…";
-      await savePhase2("completed");
-      console.log("[Phase2] project_phases.update OK");
 
-      const { data: updProj, error: eProj } = await sb
-        .from("projects")
-        .update({ current_phase: 3 })
-        .eq("id", __currentProjectId)
-        .select("id,current_phase")
-        .single();
+      // salva respostas
+      await savePhase2(null);
 
-      if (eProj) {
-        console.error("[Phase2] projects.update error:", eProj);
-        throw new Error(eProj.message || "Falha ao avançar para Fase 3");
-      }
-
-      console.log("[Phase2] projects.update OK:", updProj);
-
-      const phase3 = await ensurePhaseExists(__currentProjectId, 3);
-      console.log("[Phase2] ensurePhaseExists(3) OK:", phase3?.id);
-
-      // Confirma no banco
-      const { data: check, error: eCheck } = await sb
-        .from("projects")
-        .select("current_phase")
-        .eq("id", __currentProjectId)
-        .single();
-
-      if (eCheck) throw eCheck;
-
-      if (Number(check.current_phase) !== 3) {
-        throw new Error("Banco não confirmou avanço para Fase 3.");
-      }
-
-
-      // XP da conclusão da fase 2 (defina um valor fixo)
+      // executa fluxo oficial de conclusão + avanço
       const session = window.__session || await ensureSessionLoaded();
-      const userId = session?.user?.id;
-        if (userId) {
-          await grantXpOnce({
-          userId,
-          projectId: __currentProjectId,
-          eventType: "PHASE_COMPLETED",
-          sourceId: __phase2RowId,
-          xpAmount: 80
-        });
-      }
+      await completePhase2Flow({
+        projectId: __currentProjectId,
+        userId: session.user.id
+      });
 
-      if (phase2Msg) phase2Msg.textContent = "Fase 2 concluída ✅ XP somado! Próximo: Fase 3.";
-      // opcional: atualizar bloco Hoje
-      if (userId && __activeProjectCache?.id === __currentProjectId) {
+      if (phase2Msg) phase2Msg.textContent = "Fase 2 concluída ✅ Próximo: Fase 3.";
+
+      // re-render do detalhe para já entrar na fase 3
+      await renderProjectDetail(session, __currentProjectId);
+
+      // e atualiza bloco Hoje
+      if (__activeProjectCache?.id === __currentProjectId) {
         await renderTodayOnDashboard(session, __activeProjectCache);
       }
+
     } catch (e) {
       console.error(e);
-      if (phase2Msg) phase2Msg.textContent = "Erro ao concluir fase.";
+      if (phase2Msg) phase2Msg.textContent = `Erro ao concluir fase: ${e?.message || "ver console"}`;
     } finally {
       btnCompletePhase2.disabled = false;
     }
   });
+
 
 
   const phase2Actions = document.getElementById("phase2Actions");
