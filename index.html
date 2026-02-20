@@ -2270,29 +2270,33 @@ async function incrementProjectXp(projectId, userId, delta) {
     if (error) throw new Error(`project_phases.select(phase ${phaseNumber}): ${error.message}`);
 
     // já existe
-    if (data && data[0]) return data[0];
+    if (data && data[0]) {
+      const row = data[0];
+      const q = row?.content_json?.questions || [];
+      const hasQuestions = Array.isArray(q) && q.length > 0;
 
-    // cria
-    const t = getPhaseTemplate(phaseNumber);
+      // 🔧 Backfill: fase existe mas foi criada vazia
+      if (!hasQuestions) {
+        const t = getPhaseTemplate(phaseNumber);
+        const fixed = {
+          ...(row.content_json || {}),
+          questions: t.questions || [],
+          answers: Array.isArray(t.questions) ? t.questions.map(() => "") : []
+        };
 
-    const { data: created, error: e2 } = await sb
-      .from("project_phases")
-      .insert({
-        project_id: projectId,
-        phase_number: phaseNumber,
-        phase_title: t.title,
-        status: "active",
-        content_json: {
-          questions: t.questions,
-          answers: Array.isArray(t.questions) ? t.questions.map(() => "") : {},
-        }
-      })
-      .select("*")
-      .single();
+        const { data: patched, error: ePatch } = await sb
+          .from("project_phases")
+          .update({ content_json: fixed })
+          .eq("id", row.id)
+          .select("*")
+          .single();
 
-    if (e2) throw new Error(`project_phases.insert(phase ${phaseNumber}): ${e2.message}`);
+        if (ePatch) throw new Error(`project_phases.update(backfill ${phaseNumber}): ${ePatch.message}`);
+        return patched;
+      }
 
-    return created;
+      return row;
+    }
   }
 
 
