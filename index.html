@@ -486,6 +486,22 @@
 
       <p id="phase2Msg" class="muted small" style="display:none; margin-top:10px;"></p>
 
+      <!-- FASE 3 -->
+      <div class="sep"></div>
+
+      <div class="q" id="phase3Block" style="display:none;">
+        <label>FASE 3 — Validação rápida (mundo real)</label>
+        <div class="muted small" id="phase3Progress">Progresso: 0%</div>
+      </div>
+
+      <div id="phase3QuestionsWrap" style="display:none;"></div>
+
+      <div class="row" id="phase3Actions" style="display:none; justify-content:flex-end; gap:10px; margin-top:10px;">
+        <button id="btnSavePhase3" class="btn">Salvar progresso</button>
+        <button id="btnCompletePhase3" class="btn primary">Concluir Fase 3</button>
+      </div>
+
+      <p id="phase3Msg" class="muted small" style="display:none; margin-top:10px;"></p>
     </section>
 
 
@@ -2178,12 +2194,21 @@ async function incrementProjectXp(projectId, userId, delta) {
   const btnSavePhase2 = document.getElementById("btnSavePhase2");
   const btnCompletePhase2 = document.getElementById("btnCompletePhase2");
 
+  const phase3Block = document.getElementById("phase3Block");
+  const phase3QuestionsWrap = document.getElementById("phase3QuestionsWrap");
+  const phase3Progress = document.getElementById("phase3Progress");
+  const phase3Msg = document.getElementById("phase3Msg");
+  const phase3Actions = document.getElementById("phase3Actions");
+  const btnSavePhase3 = document.getElementById("btnSavePhase3");
+  const btnCompletePhase3 = document.getElementById("btnCompletePhase3");
+
   let __currentProjectId = null;
   let __phase1RowId = null; // id do project_phases (linha)
   let __phase1Json = null;  // content_json em memória
   let __phase2RowId = null;
   let __phase2Json = null;
-
+  let __phase3RowId = null;
+  let __phase3Json = null;
 
   function getPhaseTemplate(phaseNumber) {
     if (phaseNumber === 1) {
@@ -2333,6 +2358,15 @@ async function incrementProjectXp(projectId, userId, delta) {
           // fallback: se ainda não existe UI fase 2, pelo menos não quebra
           console.warn("paintPhase2UI não existe ainda. Mostrando fase 1 por enquanto.");
           paintPhase1UI();
+        }
+          } else if (currentPhase === 3) {
+        __phase3RowId = phaseCurrentRow.id;
+        __phase3Json = phaseCurrentRow.content_json || {};
+
+        if (typeof paintPhase3UI === "function") {
+          paintPhase3UI();
+        } else {
+          console.warn("paintPhase3UI não existe ainda. (Fase 3 não vai renderizar)");
         }
       } else {
         // outras fases no futuro
@@ -2575,6 +2609,47 @@ async function incrementProjectXp(projectId, userId, delta) {
     }
   });
 
+  btnSavePhase3?.addEventListener("click", async () => {
+    try {
+      btnSavePhase3.disabled = true;
+      if (phase3Msg) phase3Msg.textContent = "Salvando…";
+      await savePhase3(null);
+      if (phase3Msg) phase3Msg.textContent = "Salvo ✅";
+    } catch (e) {
+      console.error(e);
+      if (phase3Msg) phase3Msg.textContent = "Erro ao salvar.";
+    } finally {
+      btnSavePhase3.disabled = false;
+    }
+  });
+
+  btnCompletePhase3?.addEventListener("click", async () => {
+    try {
+      btnCompletePhase3.disabled = true;
+
+      const pct = updatePhase3Progress();
+      const total = (__phase3Json?.questions?.length || 5);
+
+      if (pct < 100) {
+        if (phase3Msg) phase3Msg.textContent = `Complete as ${total} respostas antes de concluir. (${pct}%)`;
+        return;
+      }
+
+      if (phase3Msg) phase3Msg.textContent = "Concluindo Fase 3…";
+      await savePhase3("completed");
+
+      // opcional: avançar para fase 4 futuramente
+      // await sb.from("projects").update({ current_phase: 4 }).eq("id", __currentProjectId);
+
+      if (phase3Msg) phase3Msg.textContent = "Fase 3 concluída ✅";
+    } catch (e) {
+      console.error(e);
+      if (phase3Msg) phase3Msg.textContent = `Erro ao concluir fase: ${e?.message || "ver console"}`;
+    } finally {
+      btnCompletePhase3.disabled = false;
+    }
+  });
+
 
 
   const phase2Actions = document.getElementById("phase2Actions");
@@ -2661,6 +2736,69 @@ async function incrementProjectXp(projectId, userId, delta) {
     }
 
     console.log("[Phase2] project_phases.update OK:", data);
+  }
+
+  function updatePhase3Progress() {
+    const questions = __phase3Json?.questions || [];
+    const answers = __phase3Json?.answers || [];
+    const pct = calcPhasePercent(answers, questions.length || 5);
+    if (phase3Progress) phase3Progress.textContent = `Progresso: ${pct}%`;
+    return pct;
+  }
+
+  function paintPhase3UI() {
+    if (phase3Block) phase3Block.style.display = "block";
+    if (phase3QuestionsWrap) phase3QuestionsWrap.style.display = "block";
+    if (phase3Actions) phase3Actions.style.display = "flex";
+    if (phase3Msg) { phase3Msg.style.display = "block"; phase3Msg.textContent = ""; }
+
+    const q = __phase3Json?.questions || [];
+    const a = Array.isArray(__phase3Json?.answers) ? __phase3Json.answers : [];
+
+    __phase3Json.answers = Array.isArray(__phase3Json.answers) ? __phase3Json.answers : [];
+
+    if (phase3QuestionsWrap) {
+      phase3QuestionsWrap.innerHTML = "";
+      q.forEach((question, idx) => {
+        const box = document.createElement("div");
+        box.className = "q";
+        box.innerHTML = `
+          <label>${escapeHtml(question)}</label>
+          <textarea data-q3="${idx}" placeholder="Responda de forma direta…"></textarea>
+        `;
+        phase3QuestionsWrap.appendChild(box);
+
+        const ta = box.querySelector("textarea");
+        ta.value = a[idx] || "";
+        ta.addEventListener("input", () => {
+          __phase3Json.answers[idx] = ta.value;
+          updatePhase3Progress();
+        });
+      });
+    }
+
+    updatePhase3Progress();
+  }
+
+  async function savePhase3(statusOverride = null) {
+    if (!__phase3RowId) throw new Error("Fase 3 não carregada.");
+
+    const update = { content_json: __phase3Json };
+    if (statusOverride) update.status = statusOverride;
+
+    const { data, error } = await sb
+      .from("project_phases")
+      .update(update)
+      .eq("id", __phase3RowId)
+      .select("id,status")
+      .single();
+
+    if (error) {
+      console.error("[Phase3] savePhase3 error:", error);
+      throw new Error(error.message || "Falha ao salvar Fase 3");
+    }
+
+    console.log("[Phase3] project_phases.update OK:", data);
   }
 
 
